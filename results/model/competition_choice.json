@@ -1,0 +1,9 @@
+{
+  "chosen": "w2s_t1.4_h10s",
+  "window_s": 2.0,
+  "threshold": 1.4,
+  "hold_s": 10.0,
+  "share_vs_cubic_%": 36.5,
+  "eligible": 19,
+  "settings": 28
+}

@@ -1,0 +1,12 @@
+# Keep Unix line endings for scripts and code, even when cloned on Windows,
+# so bash scripts run inside WSL without "bad interpreter: /bin/bash^M".
+*.sh    text eol=lf
+*.py    text eol=lf
+*.cc    text eol=lf
+*.h     text eol=lf
+*.toml  text eol=lf
+*.md    text eol=lf
+*.csv   text eol=lf
+*.png   binary
+*.pdf   binary
+*.pkl   binary

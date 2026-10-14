@@ -1,0 +1,18 @@
+Predictive TCP vs Reno at each buffer size (mean of 5 seeds):
+ queue  level  drops_vs_reno_%  rtt_vs_reno_%  goodput_vs_reno_%  jain  seeds_fewer_drops  seeds_lower_rtt  reno_mode_%
+    20 medium            -86.3           -9.6               98.2   1.0                  5                5          0.0
+    20   high            -87.8          -16.8               99.4   0.9                  5                5          0.0
+    50 medium            -91.3          -25.9               98.0   1.0                  5                5          0.0
+    50   high            -90.0          -36.5               99.6   1.0                  5                5          0.0
+   100 medium            -96.1          -43.1               97.6   1.0                  5                5          0.4
+   100   high            -61.9          -23.9              100.0   0.9                  5                5         45.2
+
+Sharing the link with 4 CUBIC flows (high load, mean of 5 seeds):
+                       share_mean  share_std  tested_mbps  cubic_mbps  mean_rtt_ms   drops
+variant                                                                                   
+cubic                       48.25       2.41         4.20        4.51       108.95  1376.0
+reno                        44.81       1.22         3.90        4.80       105.89  1465.4
+vegas                       34.86       1.39         3.03        5.66       111.21  1030.4
+bbr                         94.14       2.27         8.08        0.51       115.53  5547.8
+predictive_nodetector       23.12       1.18         2.01        6.67       101.61   809.6
+predictive                  35.85       1.04         3.11        5.57       104.15  1093.6

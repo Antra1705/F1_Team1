@@ -1,0 +1,11 @@
+level,vs,fewer_drops,lower_rtt,goodput_within_5pct,seeds
+medium,tahoe,5,5,5,5
+medium,reno,5,5,5,5
+medium,cubic,5,5,5,5
+medium,vegas,0,5,5,5
+medium,bbr,5,5,5,5
+high,tahoe,5,5,5,5
+high,reno,5,5,5,5
+high,cubic,5,5,5,5
+high,vegas,5,5,5,5
+high,bbr,5,5,5,5

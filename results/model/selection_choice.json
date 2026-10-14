@@ -1,0 +1,17 @@
+{
+  "chosen": "delay_only_0.5s",
+  "eligible": [
+    "phase_2_set_0.5s",
+    "full_set_0.5s",
+    "full_set_0.2s",
+    "full_set_1.0s",
+    "delay_only_0.5s"
+  ],
+  "score": {
+    "phase_2_set_0.5s": -52.29,
+    "full_set_0.5s": -57.83,
+    "full_set_0.2s": -75.63,
+    "full_set_1.0s": -52.02,
+    "delay_only_0.5s": -116.11
+  }
+}

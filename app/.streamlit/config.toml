@@ -1,0 +1,30 @@
+# Powder-blue broadsheet theme: powder-blue page, tonal blue-teal ink (same hue as the page), one indigo-violet accent (used in the page
+# CSS only for the proposed method). Controls are navy-ink and square-edged. Text pairs >= 4.5:1.
+# Fonts: IBM Plex Sans (everything) + IBM Plex Mono (figures) — one engineering superfamily.
+[theme]
+base = "light"
+primaryColor = "#0D2B36"
+backgroundColor = "#C4E0E8"
+secondaryBackgroundColor = "#D5EAF0"
+textColor = "#0D2B36"
+linkColor = "#3F3294"
+borderColor = "#93B8C6"
+showWidgetBorder = true
+baseRadius = "none"
+baseFontSize = 15
+font = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500;1,600&display=swap"
+headingFont = "IBM Plex Sans:https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&display=swap"
+codeFont = "IBM Plex Mono:https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"
+headingFontWeights = 600
+chartCategoricalColors = ["#225081", "#7A5200", "#4B3BA8", "#8A365E", "#1F6338", "#4B626C"]
+
+[theme.sidebar]
+backgroundColor = "#B2D3DD"
+secondaryBackgroundColor = "#D5EAF0"
+borderColor = "#93B8C6"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

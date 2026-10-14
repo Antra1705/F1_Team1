@@ -1,0 +1,7 @@
+variant,share_mean,share_std,tested_mbps,cubic_mbps,mean_rtt_ms,drops
+cubic,48.25,2.41,4.2,4.51,108.95,1376.0
+reno,44.81,1.22,3.9,4.8,105.89,1465.4
+vegas,34.86,1.39,3.03,5.66,111.21,1030.4
+bbr,94.14,2.27,8.08,0.51,115.53,5547.8
+predictive_nodetector,23.12,1.18,2.01,6.67,101.61,809.6
+predictive,35.85,1.04,3.11,5.57,104.15,1093.6

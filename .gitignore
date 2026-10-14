@@ -1,0 +1,24 @@
+# Python environment
+.venv/
+__pycache__/
+.DS_Store
+
+# Raw simulation output and intermediate data: about 200 MB, all regenerated
+# exactly by ./run_all.sh. Summary tables, graphs and RESULTS.md are kept.
+results/raw/
+results/validation/
+results/ablation/
+results/tuning/
+results/competition_tuning/
+results/model_selection/
+results/robustness/queue*/
+results/robustness/mixed*/
+results/dataset.csv
+results/model/test_predictions.csv
+
+# Snapshot of the results before Phases 5-8 (kept locally for before/after)
+results/v1/
+
+# Interactive app: its own environment and cached simulation runs
+app/.venv/
+app/runs/

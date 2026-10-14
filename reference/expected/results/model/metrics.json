@@ -1,0 +1,104 @@
+{
+  "train_seeds": [
+    1,
+    2,
+    3
+  ],
+  "test_seeds": [
+    4,
+    5
+  ],
+  "train_samples": 64119,
+  "test_samples": 42235,
+  "model_features": [
+    "rtt_ratio",
+    "rtt_grad",
+    "est_queue_pkts",
+    "rtt_trend_05",
+    "rtt_trend_1",
+    "rtt_vs_avg"
+  ],
+  "horizon_s": 0.5,
+  "tree_depth": 2,
+  "tree_leaves": 4,
+  "cv_macro_f1_by_depth": {
+    "2": 0.6206,
+    "3": 0.6067,
+    "4": 0.5901,
+    "5": 0.6059
+  },
+  "test": [
+    {
+      "model": "Decision Tree",
+      "accuracy": 0.8043,
+      "macro_f1": 0.6049,
+      "high_precision": 0.9051,
+      "high_recall": 0.8625,
+      "high_f1": 0.8833
+    },
+    {
+      "model": "Logistic Regression",
+      "accuracy": 0.65,
+      "macro_f1": 0.5395,
+      "high_precision": 0.9297,
+      "high_recall": 0.6215,
+      "high_f1": 0.745
+    },
+    {
+      "model": "Reactive (loss-based)",
+      "accuracy": 0.5474,
+      "macro_f1": 0.3641,
+      "high_precision": 0.9154,
+      "high_recall": 0.4982,
+      "high_f1": 0.6453
+    }
+  ],
+  "accuracy_by_level": {
+    "high": {
+      "Decision Tree": 0.882,
+      "Logistic Regression": 0.642,
+      "Reactive (loss-based)": 0.559
+    },
+    "low": {
+      "Decision Tree": 0.899,
+      "Logistic Regression": 0.983,
+      "Reactive (loss-based)": 1.0
+    },
+    "medium": {
+      "Decision Tree": 0.605,
+      "Logistic Regression": 0.522,
+      "Reactive (loss-based)": 0.327
+    }
+  },
+  "early_warning": {
+    "Decision Tree": {
+      "drop_bursts": 315,
+      "median_lead_ms": 1000.0,
+      "warned_100ms_pct": 99.04761904761905,
+      "warned_200ms_pct": 94.92063492063491,
+      "false_alarm_pct": 20.533603512326916
+    },
+    "Logistic Regression": {
+      "drop_bursts": 315,
+      "median_lead_ms": 500.0,
+      "warned_100ms_pct": 91.42857142857143,
+      "warned_200ms_pct": 85.39682539682539,
+      "false_alarm_pct": 13.54290233293792
+    },
+    "Reactive (loss-based)": {
+      "drop_bursts": 315,
+      "median_lead_ms": 0.0,
+      "warned_100ms_pct": 38.095238095238095,
+      "warned_200ms_pct": 38.095238095238095,
+      "false_alarm_pct": 11.872909698996656
+    }
+  },
+  "feature_importance": {
+    "rtt_ratio": 0.902,
+    "rtt_grad": 0.0,
+    "est_queue_pkts": 0.0,
+    "rtt_trend_05": 0.0,
+    "rtt_trend_1": 0.0,
+    "rtt_vs_avg": 0.098
+  }
+}

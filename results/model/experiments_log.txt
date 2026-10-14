@@ -1,0 +1,26 @@
+horizon 0.2 s, Loss only   : depth 2, macro-F1 0.628, High recall 0.804, uses ['since_loss']
+horizon 0.2 s, Delay only  : depth 4, macro-F1 0.638, High recall 0.708, uses ['rtt_ratio', 'rtt_grad', 'est_queue_pkts', 'rtt_trend_05', 'rtt_trend_1']
+horizon 0.2 s, Phase 2 set : depth 5, macro-F1 0.650, High recall 0.686, uses ['rtt_ratio', 'rtt_grad', 'est_queue_pkts', 'cwnd_rel', 'loss_2s']
+horizon 0.2 s, Full set    : depth 4, macro-F1 0.680, High recall 0.848, uses ['rtt_ratio', 'rtt_grad', 'cwnd_rel', 'loss_2s', 'rtt_vs_avg', 'since_loss']
+horizon 0.5 s, Loss only   : depth 2, macro-F1 0.626, High recall 0.728, uses ['loss_2s', 'since_loss']
+horizon 0.5 s, Delay only  : depth 2, macro-F1 0.605, High recall 0.863, uses ['rtt_ratio', 'rtt_vs_avg']
+horizon 0.5 s, Phase 2 set : depth 2, macro-F1 0.621, High recall 0.728, uses ['rtt_ratio', 'loss_2s']
+horizon 0.5 s, Full set    : depth 5, macro-F1 0.631, High recall 0.684, uses ['rtt_ratio', 'rtt_grad', 'est_queue_pkts', 'cwnd_rel', 'loss_2s', 'rtt_trend_05', 'rtt_trend_1', 'rtt_vs_avg', 'since_loss']
+horizon 1.0 s, Loss only   : depth 2, macro-F1 0.624, High recall 0.703, uses ['loss_2s', 'since_loss']
+horizon 1.0 s, Delay only  : depth 2, macro-F1 0.563, High recall 0.839, uses ['rtt_ratio', 'rtt_vs_avg']
+horizon 1.0 s, Phase 2 set : depth 4, macro-F1 0.590, High recall 0.633, uses ['rtt_ratio', 'rtt_grad', 'est_queue_pkts', 'cwnd_rel', 'loss_2s']
+horizon 1.0 s, Full set    : depth 2, macro-F1 0.627, High recall 0.703, uses ['rtt_ratio', 'loss_2s', 'since_loss']
+
+ horizon_s    features  depth  leaves  accuracy  macro_f1  high_precision  high_recall  high_f1  warned_200ms_pct  false_alarm_pct
+       0.2   Loss only      2       4     0.709     0.628           0.776        0.804    0.790            94.620           21.549
+       0.2  Delay only      4      15     0.688     0.638           0.839        0.708    0.768            83.861           16.928
+       0.2 Phase 2 set      5      31     0.686     0.650           0.854        0.686    0.761            88.291           14.599
+       0.2    Full set      4      16     0.761     0.680           0.829        0.848    0.839            92.089           17.908
+       0.5   Loss only      2       3     0.719     0.626           0.944        0.728    0.822            66.984           12.223
+       0.5  Delay only      2       4     0.804     0.605           0.905        0.863    0.883            94.921           20.534
+       0.5 Phase 2 set      2       4     0.725     0.621           0.944        0.728    0.822            66.984           12.223
+       0.5    Full set      5      24     0.704     0.631           0.963        0.684    0.800            65.714            9.303
+       1.0   Loss only      2       3     0.719     0.624           0.966        0.703    0.813            66.774           12.330
+       1.0  Delay only      2       4     0.772     0.563           0.940        0.839    0.887            94.839           20.813
+       1.0 Phase 2 set      4      16     0.658     0.590           0.976        0.633    0.768            65.806           10.060
+       1.0    Full set      2       4     0.719     0.627           0.966        0.703    0.813            66.774           12.330

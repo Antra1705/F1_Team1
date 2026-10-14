@@ -1,0 +1,36 @@
+Model features: ['rtt_ratio', 'rtt_grad', 'est_queue_pkts', 'rtt_trend_05', 'rtt_trend_1', 'rtt_vs_avg']
+Cross-validated macro-F1 by tree depth: {2: np.float64(0.621), 3: np.float64(0.607), 4: np.float64(0.59), 5: np.float64(0.606)} -> chosen depth 2
+
+Train 64,119 samples (seeds [1, 2, 3]), test 42,235 (seeds [4, 5])
+Decision Tree: depth 2, 4 leaves
+
+                model  accuracy  macro_f1  high_precision  high_recall  high_f1
+        Decision Tree     0.804     0.605           0.905        0.863    0.883
+  Logistic Regression     0.650     0.539           0.930        0.621    0.745
+Reactive (loss-based)     0.547     0.364           0.915        0.498    0.645
+
+Accuracy by congestion level:
+        Decision Tree  Logistic Regression  Reactive (loss-based)
+high            0.882                0.642                  0.559
+low             0.899                0.983                  1.000
+medium          0.605                0.522                  0.327
+
+Early warning before drop bursts:
+                       drop_bursts  median_lead_ms  warned_100ms_pct  warned_200ms_pct  false_alarm_pct
+Decision Tree                315.0          1000.0              99.0              94.9             20.5
+Logistic Regression          315.0           500.0              91.4              85.4             13.5
+Reactive (loss-based)        315.0             0.0              38.1              38.1             11.9
+
+Feature importance: {'rtt_ratio': 0.902, 'rtt_grad': 0.0, 'est_queue_pkts': 0.0, 'rtt_trend_05': 0.0, 'rtt_trend_1': 0.0, 'rtt_vs_avg': 0.098}
+
+Decision Tree classification report:
+              precision    recall  f1-score   support
+
+         Low      0.691     0.778     0.732      7589
+      Medium      0.183     0.218     0.199      2824
+        High      0.905     0.863     0.883     31822
+
+    accuracy                          0.804     42235
+   macro avg      0.593     0.620     0.605     42235
+weighted avg      0.818     0.804     0.810     42235
+
