@@ -9,7 +9,7 @@
 ## 1. The Project in Brief
 
 - **Course:** BCSE308L Computer Networks, VIT, taught by Prof. Sreethar S.
-- **Student:** Antra, 24BDS0066.
+- **Team:** Antra (24BDS0066), Anuska Sen (24BCE2219), Varshini Harikrishna (24BCE0780). The repository is https://github.com/Antra1705/CN.
 - **Goal:** compare TCP Tahoe, Reno, CUBIC, Vegas and BBR in NS-3, then train a small decision tree that predicts bottleneck congestion 0.5 s ahead.
 - **Proposed variant:** *Predictive TCP*, which uses that tree inside the sender to back off before the queue overflows.
 - **User preferences:** work in phases, one phase per request ("build phase N"). Be honest about weak results; never overclaim.

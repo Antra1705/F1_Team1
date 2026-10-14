@@ -2,7 +2,8 @@
 
 A college networking project that compares **TCP Tahoe, Reno, CUBIC, Vegas and BBR** in NS-3, trains a **lightweight decision tree** to predict bottleneck congestion **0.5 s before it happens**, and uses that prediction inside a new TCP variant, **Predictive TCP**. Predictive TCP backs off *before* the router queue overflows.
 
-**Author:** Antra (24BDS0066) · **Course:** BCSE308L Computer Networks, VIT
+**Authors:** Antra (24BDS0066) · Anuska Sen (24BCE2219) · Varshini Harikrishna (24BCE0780)  
+**Course:** BCSE308L Computer Networks, VIT  
 **Tools:** NS-3.48 (C++), Python 3.13, scikit-learn, pandas, NumPy, Matplotlib, Streamlit (interactive app)
 
 **Contents:** [About](#about-the-project) · [What was done](#what-was-done) · [Quick start](#quick-start) · [Results](#headline-results) · [How it works](#how-predictive-tcp-works) · [Setup](#setup-step-by-step) · [Running](#running-the-experiments) · [Same results on every OS](#getting-results-identical-to-macos-on-any-system) · [Interactive app](#interactive-simulator-app) · [Troubleshooting](#troubleshooting) · [Findings](#key-findings-and-design-decisions) · [Limitations](#limitations)
@@ -222,7 +223,7 @@ brew install cmake ninja uv
 #### Step 2: Get the project
 
 ```bash
-git clone <repository-url> TCP-Congestion-Predictor
+git clone https://github.com/Antra1705/CN.git TCP-Congestion-Predictor
 cd TCP-Congestion-Predictor
 chmod +x *.sh app/run_app.sh              # make the scripts executable (needed after some downloads)
 ```
