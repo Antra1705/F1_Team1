@@ -350,7 +350,7 @@ with st.sidebar:
         comp_window = st.slider("Detector window (s)", 1, 8, 2, disabled=not detector)
         comp_threshold = st.slider("Detector threshold (min RTT ÷ base RTT)", 1.05, 2.0, 1.4, step=0.05,
                                    disabled=not detector)
-        comp_hold = st.slider("Detector hold (s)", 0, 20, 10, disabled=not detector)
+        comp_hold = st.slider("Detector hold (s)", 0, 20, 5, disabled=not detector)
     smooth = st.toggle("Smooth charts (1 s moving average)", value=True)
     run = st.button("Run simulation", type="primary", width="stretch", disabled=binary is None or not chosen)
     st.caption(f"{len(chosen)} simulation{'s' if len(chosen) != 1 else ''} · about "
@@ -476,8 +476,8 @@ with tab_sim:
                 <span class="fair" title="fair share"></span></div>
                 <div class="scale"><span>0%</span><span>fair 50%</span><span>100%</span></div></div>""",
                         unsafe_allow_html=True)
-            st.markdown('<div class="note">Reference over 5 seeds: CUBIC 48%, Reno 45%, Vegas 35%, Predictive 36% '
-                        'with the detector (23% without), BBR 94%.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="note">Reference over 10 seeds: CUBIC 48%, Reno 45%, Vegas 34%, Predictive 40% '
+                        'with the detector (23% without), BBR 95%.</div>', unsafe_allow_html=True)
 
             st.markdown('<div class="section">Over time</div>', unsafe_allow_html=True)
             group = samples.assign(series=samples.flow.mod(2).map({0: name, 1: "CUBIC"}))
@@ -493,7 +493,7 @@ with tab_sim:
             c2.altair_chart(line_chart(both, "Bottleneck queue (packets)", 3), width="stretch", height=260)
 
 with tab_results:
-    st.markdown('<div class="section">Final results · mean ± std over 5 seeds × 60 s · 10 Mbps / 20 ms / '
+    st.markdown('<div class="section">Final results · mean ± std over 10 seeds × 60 s · 10 Mbps / 20 ms / '
                 '50-packet queue</div>', unsafe_allow_html=True)
     final = RESULTS / "final_table.csv"
     if final.exists():
@@ -556,7 +556,8 @@ with tab_how:
 - **Sender-side only:** it uses nothing but the sender's own RTT measurements. The router queue is used only to
   label the training data.
 - **Competition detector:** if the lowest RTT over 2 s stays above 1.4 × the base RTT, the queue never drained,
-  so a loss-based sender such as CUBIC is assumed and Predictive TCP behaves like Reno for at least 10 s.
+  so a loss-based sender such as CUBIC is assumed and Predictive TCP behaves like Reno for at least 5 s. The base
+  RTT is the lowest raw RTT sample, so flows that start behind a full queue still learn the true base RTT.
 - **Safety net:** Reno's normal loss response still applies, and the predictor never acts below a 4-segment window.
 """, unsafe_allow_html=True)
     header = ROOT / "ns3" / "predictive-model.h"

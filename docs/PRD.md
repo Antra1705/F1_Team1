@@ -210,6 +210,10 @@ The numbers below are **targets**. The final report will state the values actual
 | M7 | Delay-aware Predictive TCP | Delay reaction, tuning on seeds 1–3, re-runs | ✅ Done (high-load RTT −37%, 5/5 seeds) |
 | M8 | Robustness tests | Buffer sweep, mixed Predictive + CUBIC | ✅ Done (buffers: holds; vs CUBIC: 23% share, documented) |
 | M8b | Competition detector | Detector in `TcpPredictive`, tuning on seeds 1–3 | ✅ Done (vs CUBIC 23% → 36%; 100-packet false alarms documented) |
+| M10 | Weaknesses re-examined | Detector base-RTT fix, link sweep, trivial-guess comparison | ✅ Done (vs CUBIC 36% → 41%; unfair on fast/long links, cause documented) |
+| M11 | Fairness vs gain | 6 models × 18 settings with a 50 Mbps fairness limit | ✅ Done (fair only with about half the gain; deployed model kept) |
+| M12 | Significance | Paired tests and confidence intervals over seeds | ✅ Done (all headline gains significant; 2% goodput cost real) |
+| M13 | 10 seeds | Every evaluation repeated on seeds 1–10 | ✅ Done (drops −93% / −90%, RTT −28% / −36%, p < 0.0001; vs CUBIC 40%) |
 | M9 | Report + presentation | Final documents (format to be decided) | Ready to submit |
 
 ---

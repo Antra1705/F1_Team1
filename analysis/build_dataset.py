@@ -10,6 +10,7 @@ RTT relative to its recent average) and the time since the last loss.
 Usage: .venv/bin/python analysis/build_dataset.py
 """
 
+import os
 from pathlib import Path
 
 import numpy as np
@@ -36,16 +37,26 @@ HISTORY = 20           # samples (2 s) used for the window maximum
 TREND_SHORT = 5        # samples (0.5 s) for the short RTT trend
 TREND_LONG = 10        # samples (1 s) for the long RTT trend and the RTT average
 LABEL_NAMES = ["Low", "Medium", "High"]
+# RTT signal the features are computed from (Phase 11): "smoothed" (the socket's smoothed RTT)
+# or "min" (lowest raw RTT sample per interval). Must match TcpPredictive::MinRttSignal.
+RTT_SIGNAL = os.environ.get("RTT_SIGNAL", "smoothed")
 
 
 def sender_features(df):
     """Per-flow features computed exactly as the sender will compute them."""
     df = df.sort_values(["flow", "time"]).copy()
-    prev_srtt = df.groupby("flow").srtt_ms.shift(1)
-    df["rtt_ratio"] = df.srtt_ms / df.min_rtt_ms
-    df["rtt_grad"] = ((df.srtt_ms - prev_srtt) / df.min_rtt_ms).fillna(0.0)
+    if RTT_SIGNAL == "min":
+        # Lowest raw RTT sample of each 100 ms interval, and the lowest raw sample so far as
+        # the base RTT (TcpPredictive::MinRttSignal): not inflated by delayed ACKs for small
+        # windows, and the base reaches the true RTT for flows that start behind a queue
+        rtt, base = df.rtt_min_int_ms, df.raw_min_rtt_ms
+    else:
+        rtt, base = df.srtt_ms, df.min_rtt_ms  # smoothed RTT and its lowest value so far
+    prev_rtt = rtt.groupby(df.flow).shift(1)
+    df["rtt_ratio"] = rtt / base
+    df["rtt_grad"] = ((rtt - prev_rtt) / base).fillna(0.0)
     df["cwnd_seg"] = df.cwnd_bytes / SEGMENT
-    df["est_queue_pkts"] = (df.cwnd_seg * (1 - df.min_rtt_ms / df.srtt_ms)).clip(lower=0)
+    df["est_queue_pkts"] = (df.cwnd_seg * (1 - base / rtt)).clip(lower=0)
     # Position in the saw-tooth: cwnd relative to its maximum over the last 2 s
     recent_max = df.groupby("flow").cwnd_bytes.transform(lambda x: x.rolling(HISTORY, min_periods=1).max())
     df["cwnd_rel"] = df.cwnd_bytes / recent_max
@@ -53,10 +64,10 @@ def sender_features(df):
     df["loss_2s"] = df.loss_events_2s
     # Queue trend: how much the RTT grew over the last 0.5 s and 1 s (in units of
     # the base RTT), and the RTT relative to its own 1 s average
-    srtt = df.groupby("flow").srtt_ms
-    df["rtt_trend_05"] = ((df.srtt_ms - srtt.shift(TREND_SHORT)) / df.min_rtt_ms).fillna(0.0)
-    df["rtt_trend_1"] = ((df.srtt_ms - srtt.shift(TREND_LONG)) / df.min_rtt_ms).fillna(0.0)
-    df["rtt_vs_avg"] = df.srtt_ms / srtt.transform(lambda x: x.rolling(TREND_LONG, min_periods=1).mean())
+    by_flow = rtt.groupby(df.flow)
+    df["rtt_trend_05"] = ((rtt - by_flow.shift(TREND_SHORT)) / base).fillna(0.0)
+    df["rtt_trend_1"] = ((rtt - by_flow.shift(TREND_LONG)) / base).fillna(0.0)
+    df["rtt_vs_avg"] = rtt / by_flow.transform(lambda x: x.rolling(TREND_LONG, min_periods=1).mean())
     df["since_loss"] = df.since_loss_s
     return df
 

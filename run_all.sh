@@ -46,7 +46,7 @@ EOF
 else
   echo "== 1/12 Build the NS-3 simulation"
   ./build.sh > /dev/null
-  echo "== 2/12 Baseline simulations: Tahoe, Reno, CUBIC, Vegas, BBR (75 runs)"
+  echo "== 2/12 Baseline simulations: Tahoe, Reno, CUBIC, Vegas, BBR (150 runs)"
   ./run_baseline.sh | grep -c goodput | xargs echo "   runs completed:"
   STEP=3; TOTAL=12
 fi
@@ -60,7 +60,8 @@ $PY analysis/select_model.py > results/model/selection_log.txt 2>&1
 grep "Chosen" results/model/selection_log.txt
 step "Train and evaluate the deployed models"
 $PY analysis/train_model.py > results/model/train_log.txt 2>&1
-grep -E "Model features|Decision Tree:" results/model/train_log.txt
+grep -E "Model features|Decision Tree:|WARNING" results/model/train_log.txt
+$PY analysis/prediction_baselines.py > results/model/baselines_log.txt 2>&1
 step "Export the decision tree to C++"
 $PY analysis/export_tree.py
 [ $REFERENCE = 0 ] && ./build.sh > /dev/null
@@ -73,12 +74,13 @@ grep -E "Chosen|WARNING" results/model/competition_log.txt
 if [ $REFERENCE = 0 ]; then
   step "Predictive TCP simulations + ablation"
   ./run_predictive.sh | grep -c goodput | xargs echo "   runs completed:"
-  step "Robustness: buffer sizes and competition with CUBIC"
+  step "Robustness: buffer sizes, competition with CUBIC, link speeds and delays"
   ./run_robustness.sh | grep -c goodput | xargs echo "   runs completed:"
 fi
 $PY analysis/robustness.py > results/robustness/robustness_log.txt 2>&1
 step "Compare variants and draw graphs"
 $PY analysis/compare_variants.py | sed -n '/PRD 10.3/,/^$/p'
+$PY analysis/significance.py > results/significance_log.txt 2>&1
 $PY analysis/make_graphs.py | tail -2
 step "Compare with the macOS reference"
 if [ $REFERENCE = 1 ]; then

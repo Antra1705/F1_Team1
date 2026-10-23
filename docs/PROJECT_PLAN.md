@@ -23,6 +23,10 @@
 | Phase 7: controller tuned on seeds 1–3 (β 0.8, MinWindow 4); drops −91% / −90%, RTT −26% / −37%, fairness 0.96, single flow 9.7 Mbps | ✅ Done |
 | Phase 8: buffer sweep (gains hold at 20–100 packets, 5/5 seeds) + competition with CUBIC (Predictive gets only 23%) | ✅ Done |
 | Phase 8b: competition detector; share vs CUBIC 23% → 36% (unseen seeds 22% → 35%), no cost at 50 packets; false alarms with a 100-packet buffer (documented) | ✅ Done |
+| Phase 10: detector base-RTT fix (share vs CUBIC 36% → 41%, unseen seeds 35% → 39%, main results unchanged); link-speed/delay sweep (unfair on fast or long links, cause found: delayed ACKs); predictor vs a trivial guess; retrain on a cleaner RTT signal tested and not adopted | ✅ Done |
+| Phase 11: fairness on fast links vs main gain; 6 models × 18 settings; fair (0.92 at 50 Mbps) only with about half the gain, so the deployed model was kept (choice stated openly) | ✅ Done |
+| Phase 12: significance tests (paired t-test, 95% CI, sign test over seeds); every drop and RTT gain over Reno and CUBIC significant (p ≤ 0.005) | ✅ Done |
+| Phase 13: 10 seeds; every evaluation repeated on seeds 1–10 (6–10 new, never used for any choice); drops −93% / −90%, RTT −28% / −36%, all gains vs Reno and CUBIC p < 0.0001; vs CUBIC 40% | ✅ Done |
 | Phase 9: Report + presentation (format to decide) | ⬜ Next |
 
 Phases 5–9 are described in section 12.
@@ -367,6 +371,41 @@ Phases 1–4 produced a working project. Phases 5–8 fix the three questions an
 - **Cost with the 50-packet buffer:** none. It never fires there, so the main results are byte-identical.
 - **Trade-off:** settings that reach 40–44% also fire with no competitor present, because at high load the queue never fully drains, and they lose most of the gains.
 - **Weakness:** with a 100-packet buffer at high load it false-alarms in 3 of 5 seeds, and the alarm feeds itself. Drops fall to −62% instead of −87% vs Reno, and RTT to −24% instead of −50%. This is documented as README finding 16.
+
+### Phase 10: Weaknesses Re-examined (added after Phase 8b)
+
+**Goal:** find the causes behind the weak numbers (share against CUBIC, macro-F1) and fix what can be fixed without giving up the main results.
+
+- [x] **Detector base RTT.** Diagnosis: flows that start behind CUBIC's standing queue learned a base RTT of 60–85 ms from the smoothed RTT (true: 44 ms), so their detector never fired; given the true base the share reached 45%. Fix: base RTT from raw RTT samples (`DetectorRawBase`, default on); detector re-tuned on seeds 1–3 with the unchanged Phase 8b rule → window 2 s, threshold 1.4, **hold 5 s**.
+- [x] **Link-speed and delay sweep** (5/10/50 Mbps × 20/100 ms, queue 1.3 × BDP, high load, 5 seeds; `run_robustness.sh`, RESULTS 9.4).
+- [x] **Predictor vs a trivial "always High" guess** (`analysis/prediction_baselines.py`, RESULTS 6.3).
+- [x] **Cleaner RTT signal for the model** (lowest raw RTT per interval, `MinRttSignal`): evaluated in Phase 11.
+- [x] `train_model.py` warns if the trained model differs from the one `select_model.py` chose.
+
+**Result (✅ done):**
+- **Share against CUBIC:** 36% → 41% (training seeds 36.5% → 42.7%, unseen 34.9% → 39.3%; better in all 5 seeds). Main results byte-identical.
+- **Cost:** more false alarms where the queue never drains on its own: 100-packet buffer at high load, drops −54% vs Reno (−62% before); 5 Mbps / 20 ms, −14%.
+- **New weakness:** on fast or long links the flows share unfairly (Jain 0.45 at 50 Mbps / 20 ms, 0.71 at 10 Mbps / 100 ms) because delayed ACKs inflate the smoothed RTT of small windows. Confirmed: fair again with an ACK for every packet, or with the `MinRttSignal` input.
+- **Cleaner signal:** retrained on it, offline macro-F1 rose 0.61 → 0.66 and false alarms fell 21% → 14%; its closed-loop value was tested properly in Phase 11.
+- **Macro-F1 0.70:** not reachable with any feature set, horizon or RTT signal tested (best 0.68 on unseen seeds); the rare Medium class is the limit. Not hidden by relabelling.
+
+### Phase 11: Fairness on Fast Links vs Main Gain (added after Phase 10)
+
+**Goal:** find out whether a model on the cleaner RTT signal can be fair on fast links and keep the main gains.
+
+- [x] `analysis/signal_tradeoff.py`: 6 models (deployed + 5 candidates retrained on the new signal) × Phase 7 grid (18 settings), seeds 1–3. Rule fixed before running: Phase 7 limits + Jain ≥ 0.9 at 50 Mbps / 20 ms, then the largest drop + RTT reduction.
+- [x] Logger and dataset support both RTT signals (`RTT_SIGNAL`); every result table unchanged.
+
+**Result (✅ done):** only full-feature-set models with β 0.5 pass the 50 Mbps limit; the best keeps about half the gain (score −69 vs −122). The deployed model was kept, and the limit was dropped after seeing its price (README finding 21).
+
+### Phase 13: 10 Seeds (added after Phase 12)
+
+**Goal:** tighter, more convincing evaluation numbers without re-making any choice.
+
+- [x] `SEEDS` raised from 1–5 to 1–10 in the run scripts (env-overridable), `compare_variants.py`, `robustness.py` and `make_graphs.py`. Dataset, model and all tuning still use the same seeds and are byte-identical.
+- [x] Full `run_all.sh` (~28 min); reference archive, checksums and expected files rebuilt.
+
+**Result (✅ done):** drops −93% / −90%, RTT −28% / −36%, goodput 97.4% / 99.6%, Jain 0.99 / 0.95; all 9 PRD criteria met; fewer drops and lower RTT than Tahoe, Reno, CUBIC and BBR in 10/10 seeds at both loads; every drop and RTT gain vs Reno and CUBIC p < 0.0001. Unseen seeds 4–10 give the same gains. Shifts stated openly: share vs CUBIC 41% → 40% (Phase 10 fix better than Phase 8b in 10/10 seeds, p = 0.0006), and the 100-packet false alarm is worse (drops −40%, 71% Reno mode).
 
 ### Phase 9: Report + Presentation — about 1 day
 

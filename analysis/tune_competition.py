@@ -1,7 +1,13 @@
 """Phase 8b: tune the competition detector of Predictive TCP.
 
 Without it, Predictive TCP gets only ~23% of the bandwidth when it shares the
-link with CUBIC (Phase 8). The detector watches the lowest RTT over a window:
+link with CUBIC (Phase 8).
+
+Phase 10: the detector now measures the base RTT from raw RTT samples
+(TcpPredictive::DetectorRawBase, default on). With the lowest smoothed RTT used in
+Phase 8b, flows that start behind CUBIC's standing queue learned a base RTT of
+60-85 ms instead of 44 ms and never detected the competitor. The grid and the
+selection rule below are unchanged; only the base RTT differs. The detector watches the lowest RTT over a window:
 if the queue never drains, a loss-based sender is assumed and Predictive TCP
 behaves like plain Reno until the queue drains again.
 

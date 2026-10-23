@@ -4,6 +4,9 @@
    (the model was trained and the controller tuned with 50 packets only).
 2. Competition with CUBIC: at high load, 4 flows of one variant share the link
    with 4 CUBIC flows. A fair variant gets about 50% of the bandwidth.
+3. Other networks (Phase 10): 5, 10 and 50 Mbps with a 20 or 100 ms bottleneck
+   delay at high load, the queue scaled to 1.3x the bandwidth-delay product
+   (the model was trained and tuned at 10 Mbps / 20 ms only).
 
 Needs run_robustness.sh to have run. Writes CSV tables to results/robustness/
 and two graphs.
@@ -30,12 +33,15 @@ GRAPHS = ROOT / "results" / "graphs"
 
 QUEUES = [20, 50, 100]
 LEVELS = ["medium", "high"]
-SEEDS = [1, 2, 3, 4, 5]
-MIXED = ["cubic", "reno", "vegas", "bbr", "predictive_nodetector", "predictive"]
+SEEDS = list(range(1, 11))
+MIXED = ["cubic", "reno", "vegas", "bbr", "predictive_nodetector", "predictive_phase8b", "predictive"]
 MIXED_NAMES = {**NAMES, "predictive_nodetector": "Predictive, no detector",
-               "predictive": "Predictive (proposed)"}
-MIXED_COLORS = {**COLORS, "predictive_nodetector": "#7dcea0"}
+               "predictive_phase8b": "Predictive, Phase 8b detector", "predictive": "Predictive (proposed)"}
+MIXED_COLORS = {**COLORS, "predictive_nodetector": "#7dcea0", "predictive_phase8b": "#5dade2"}
 BDP_PACKETS = 38  # 10 Mbps x 44 ms / 1448-byte segments
+RATES = [5, 10, 50]      # Mbps
+DELAYS = [20, 100]       # one-way bottleneck delay (ms)
+NET_VARIANTS = ["reno", "cubic", "predictive"]
 
 
 def queue_dir(queue):
@@ -97,7 +103,7 @@ def buffer_sweep():
                 ax.set_xlabel("Bottleneck queue (packets)")
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, ncol=len(VARIANTS), fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 0.95))
-    fig.suptitle("Buffer-size sweep (mean of 5 seeds; model trained and tuned with 50 packets only)",
+    fig.suptitle(f"Buffer-size sweep (mean of {len(SEEDS)} seeds; model trained and tuned with 50 packets only)",
                  weight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.91))
     fig.savefig(GRAPHS / "robustness_buffer.png")
@@ -111,6 +117,8 @@ def competition():
         for s in SEEDS:
             if v == "predictive_nodetector":
                 path = ROBUST / "mixed_nodetector" / f"samples_predictive-vs-cubic_high_s{s}.csv"
+            elif v == "predictive_phase8b":
+                path = ROBUST / "mixed_phase8b" / f"samples_predictive-vs-cubic_high_s{s}.csv"
             else:
                 path = ROBUST / "mixed" / f"samples_{v}-vs-cubic_high_s{s}.csv"
             samples = pd.read_csv(path)
@@ -149,13 +157,40 @@ def competition():
     return summary
 
 
+def network_sweep():
+    rows = []
+    for rate in RATES:
+        for delay in DELAYS:
+            d = ROBUST / "network" / f"r{rate}_d{delay}"
+            for s in SEEDS:
+                m = {v: run_metrics(d, v, "high", s) for v in NET_VARIANTS}
+                p, r = m["predictive"], m["reno"]
+                reno_mode = pd.read_csv(d / f"runinfo_predictive_high_s{s}.csv").competitive_mode_pct.iloc[0]
+                rows.append({"rate_mbps": rate, "delay_ms": delay, "seed": s,
+                             "drops_vs_reno_%": 100 * (p["drops"] - r["drops"]) / max(r["drops"], 1),
+                             "rtt_vs_reno_%": 100 * (p["mean_rtt_ms"] - r["mean_rtt_ms"]) / r["mean_rtt_ms"],
+                             "goodput_vs_reno_%": 100 * p["goodput_mbps"] / r["goodput_mbps"],
+                             "jain_predictive": p["jain_fairness"], "jain_reno": r["jain_fairness"],
+                             "jain_cubic": m["cubic"]["jain_fairness"], "reno_mode_%": reno_mode,
+                             "fewer_drops": p["drops"] < r["drops"], "lower_rtt": p["mean_rtt_ms"] < r["mean_rtt_ms"]})
+    runs = pd.DataFrame(rows)
+    summary = runs.groupby(["rate_mbps", "delay_ms"]).agg(
+        **{c: (c, "mean") for c in ["drops_vs_reno_%", "rtt_vs_reno_%", "goodput_vs_reno_%", "jain_predictive",
+                                    "jain_reno", "jain_cubic", "reno_mode_%"]},
+        seeds_fewer_drops=("fewer_drops", "sum"), seeds_lower_rtt=("lower_rtt", "sum")).reset_index()
+    summary.round(3).to_csv(ROBUST / "network_sweep.csv", index=False)
+    return summary
+
+
 def main():
     rel = buffer_sweep()
-    print("Predictive TCP vs Reno at each buffer size (mean of 5 seeds):")
+    print(f"Predictive TCP vs Reno at each buffer size (mean of {len(SEEDS)} seeds):")
     print(rel.round(1).to_string(index=False))
     summary = competition()
-    print("\nSharing the link with 4 CUBIC flows (high load, mean of 5 seeds):")
+    print(f"\nSharing the link with 4 CUBIC flows (high load, mean of {len(SEEDS)} seeds):")
     print(summary.round(2).to_string())
+    print(f"\nOther link speeds and delays (high load, Predictive TCP vs Reno, mean of {len(SEEDS)} seeds):")
+    print(network_sweep().round(2).to_string(index=False))
 
 
 if __name__ == "__main__":

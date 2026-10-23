@@ -1,10 +1,10 @@
 level,criterion,value,met
-medium,Drops at least 30% lower than Reno,-91.3%,True
-medium,Average RTT lower than Reno,-25.9%,True
-medium,Average RTT lower than CUBIC,-29.7%,True
-medium,Goodput at least 90% of Reno,98.0%,True
-high,Drops at least 30% lower than Reno,-90.0%,True
-high,Average RTT lower than Reno,-36.5%,True
-high,Average RTT lower than CUBIC,-40.9%,True
+medium,Drops at least 30% lower than Reno,-93.0%,True
+medium,Average RTT lower than Reno,-27.9%,True
+medium,Average RTT lower than CUBIC,-31.4%,True
+medium,Goodput at least 90% of Reno,97.4%,True
+high,Drops at least 30% lower than Reno,-89.8%,True
+high,Average RTT lower than Reno,-36.0%,True
+high,Average RTT lower than CUBIC,-40.4%,True
 high,Goodput at least 90% of Reno,99.6%,True
-high,Jain fairness index at least 0.9 (bulk flows),0.955,True
+high,Jain fairness index at least 0.9 (bulk flows),0.953,True

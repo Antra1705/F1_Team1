@@ -279,8 +279,8 @@ TcpPredictive::GetTypeId()
                           UintegerValue(4),
                           MakeUintegerAccessor(&TcpPredictive::m_minWindow),
                           MakeUintegerChecker<uint32_t>(1))
-            // Competition detector (Phase 8b; defaults tuned on seeds 1-3 by
-            // analysis/tune_competition.py). When only Predictive flows share the
+            // Competition detector (Phase 8b, re-tuned in Phase 10 with the raw-RTT base;
+            // defaults chosen on seeds 1-3 by analysis/tune_competition.py). When only Predictive flows share the
             // bottleneck, their cuts let the queue drain now and then. A loss-based
             // sender keeps it full until packets drop, so if the lowest RTT seen over
             // the whole window stays above the threshold, the sender behaves like
@@ -301,9 +301,32 @@ TcpPredictive::GetTypeId()
                           "Stay in competitive mode at least this long after the queue was "
                           "last seen not draining (a loss-based competitor drains the queue "
                           "briefly after its own losses)",
-                          TimeValue(Seconds(10)),
+                          TimeValue(Seconds(5)),
                           MakeTimeAccessor(&TcpPredictive::m_compHold),
-                          MakeTimeChecker());
+                          MakeTimeChecker())
+            // Phase 10. The competition detector needs the true base RTT. The lowest
+            // *smoothed* RTT never gets there for a flow that starts behind a standing
+            // queue (e.g. one held by CUBIC), so that flow's threshold sits above the
+            // RTT it sees and it never detects the competitor. The lowest raw RTT
+            // sample does reach the base, because the queue dips briefly now and then.
+            // MinRttSignal is an experiment, off by default: it feeds the model the
+            // lowest raw RTT of each interval, which delayed ACKs do not inflate for
+            // small windows (fair on fast or long links), but the deployed tree was
+            // trained on the smoothed RTT and loses much of its drop reduction with it
+            // (see README, Phase 10).
+            .AddAttribute("MinRttSignal",
+                          "Experimental: model features use the lowest raw RTT sample of each "
+                          "interval and the lowest raw RTT as the base RTT (the deployed tree was "
+                          "trained on the smoothed RTT)",
+                          BooleanValue(false),
+                          MakeBooleanAccessor(&TcpPredictive::m_minRttSignal),
+                          MakeBooleanChecker())
+            .AddAttribute("DetectorRawBase",
+                          "The competition detector compares against the lowest raw RTT sample "
+                          "(false = lowest smoothed RTT, as in Phase 8b)",
+                          BooleanValue(true),
+                          MakeBooleanAccessor(&TcpPredictive::m_detectorRawBase),
+                          MakeBooleanChecker());
     return tid;
 }
 
@@ -316,7 +339,9 @@ TcpPredictive::TcpPredictive()
       m_minWindow(4),
       m_compWindow(Seconds(2)),
       m_compThreshold(1.4),
-      m_compHold(Seconds(10))
+      m_compHold(Seconds(5)),
+      m_detectorRawBase(true),
+      m_minRttSignal(false)
 {
 }
 
@@ -329,7 +354,9 @@ TcpPredictive::TcpPredictive(const TcpPredictive& sock)
       m_minWindow(sock.m_minWindow),
       m_compWindow(sock.m_compWindow),
       m_compThreshold(sock.m_compThreshold),
-      m_compHold(sock.m_compHold)
+      m_compHold(sock.m_compHold),
+      m_detectorRawBase(sock.m_detectorRawBase),
+      m_minRttSignal(sock.m_minRttSignal)
 {
 }
 
@@ -388,6 +415,7 @@ TcpPredictive::PktsAcked(Ptr<TcpSocketState> tcb, uint32_t segmentsAcked, const 
     if (lastMs > 0)
     {
         m_intervalMinRttMs = (m_intervalMinRttMs == 0) ? lastMs : std::min(m_intervalMinRttMs, lastMs);
+        m_rawMinRttMs = (m_rawMinRttMs == 0) ? lastMs : std::min(m_rawMinRttMs, lastMs);
     }
 
     Time now = Simulator::Now();
@@ -425,29 +453,32 @@ TcpPredictive::Evaluate(Ptr<TcpSocketState> tcb)
     }
     uint32_t cwndMax = *std::max_element(m_cwndHistory.begin(), m_cwndHistory.end());
 
-    if (m_srttMs > 0 && m_minRttMs > 0)
+    bool useMin = m_minRttSignal && m_intervalMinRttMs > 0 && m_rawMinRttMs > 0;
+    double sigMs = useMin ? m_intervalMinRttMs : m_srttMs;  // RTT signal for the model
+    double baseMs = useMin ? m_rawMinRttMs : m_minRttMs;     // base RTT for the model
+    if (sigMs > 0 && baseMs > 0)
     {
         double cwndSeg = static_cast<double>(cwnd) / tcb->m_segmentSize;
-        double rttRatio = m_srttMs / m_minRttMs;
-        double rttGrad = (m_prevSrttMs > 0) ? (m_srttMs - m_prevSrttMs) / m_minRttMs : 0.0;
-        double estQueue = std::max(0.0, cwndSeg * (1.0 - m_minRttMs / m_srttMs));
+        double rttRatio = sigMs / baseMs;
+        double rttGrad = (m_prevSrttMs > 0) ? (sigMs - m_prevSrttMs) / baseMs : 0.0;
+        double estQueue = std::max(0.0, cwndSeg * (1.0 - baseMs / sigMs));
         double cwndRel = cwndMax > 0 ? static_cast<double>(cwnd) / cwndMax : 1.0;
         double thrMbps = m_ackedBytes * 8.0 / elapsed / 1e6;
 
         // Queue trend (Phase 6): RTT growth over the last 0.5 s and 1 s, in units of
         // the base RTT, and the RTT relative to its average over the last 1 s
-        m_srttHistory.push_back(m_srttMs);
+        m_srttHistory.push_back(sigMs);
         if (m_srttHistory.size() > 11) // current sample + 10 previous (1 s)
         {
             m_srttHistory.pop_front();
         }
         size_t n = m_srttHistory.size();
-        double rttTrend05 = n > 5 ? (m_srttMs - m_srttHistory[n - 1 - 5]) / m_minRttMs : 0.0;
-        double rttTrend1 = n > 10 ? (m_srttMs - m_srttHistory[n - 1 - 10]) / m_minRttMs : 0.0;
+        double rttTrend05 = n > 5 ? (sigMs - m_srttHistory[n - 1 - 5]) / baseMs : 0.0;
+        double rttTrend1 = n > 10 ? (sigMs - m_srttHistory[n - 1 - 10]) / baseMs : 0.0;
         size_t avgCount = std::min<size_t>(n, 10);
         double rttAvg =
             std::accumulate(m_srttHistory.end() - avgCount, m_srttHistory.end(), 0.0) / avgCount;
-        double rttVsAvg = m_srttMs / rttAvg;
+        double rttVsAvg = sigMs / rttAvg;
         double sinceLoss = m_lastLossTime < 0 ? 10.0 : std::min(10.0, nowS - m_lastLossTime);
 
         m_prediction = predictive::PredictCongestion(rttRatio, rttGrad, estQueue, cwndSeg, cwndRel,
@@ -471,7 +502,9 @@ TcpPredictive::Evaluate(Ptr<TcpSocketState> tcb)
             if (m_rttFloorHistory.size() == needed)
             {
                 double floorMs = *std::min_element(m_rttFloorHistory.begin(), m_rttFloorHistory.end());
-                if (floorMs / m_minRttMs > m_compThreshold)
+                double detectorBaseMs =
+                    (m_detectorRawBase && m_rawMinRttMs > 0) ? m_rawMinRttMs : m_minRttMs;
+                if (floorMs / detectorBaseMs > m_compThreshold)
                 {
                     m_lastCompEvidence = now;
                 }
@@ -498,7 +531,7 @@ TcpPredictive::Evaluate(Ptr<TcpSocketState> tcb)
                 s_proactiveReductions++;
             }
         }
-        m_prevSrttMs = m_srttMs;
+        m_prevSrttMs = sigMs;
     }
     m_ackedBytes = 0;
     m_intervalMinRttMs = 0;

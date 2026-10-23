@@ -28,9 +28,11 @@ NAMES = {"tahoe": "Tahoe", "reno": "Reno", "cubic": "CUBIC", "vegas": "Vegas", "
          "predictive": "Predictive (proposed)"}
 COLORS = {"tahoe": "#8e8e8e", "reno": "#2e86c1", "cubic": "#e67e22", "vegas": "#8e44ad", "bbr": "#c0392b",
           "predictive": "#1e8449"}
-MIXED_LABELS = {"predictive_nodetector": "Predictive, no detector"}  # competition test rows
+MIXED_LABELS = {"predictive_nodetector": "Predictive, no detector",  # competition test rows
+                "predictive_phase8b": "Predictive, Phase 8b detector"}
 LEVELS = ["low", "medium", "high"]
 EXAMPLE_SEED = 4  # a test seed (not used to train the model)
+N_SEEDS = 10  # evaluation seeds per setting (seeds 1-3 train and tune; 6-10 added in Phase 13)
 SEGMENT = 1448
 
 plt.rcParams.update({"font.size": 9, "axes.grid": True, "grid.alpha": 0.3})
@@ -84,7 +86,7 @@ def bar_charts(runs):
             ax.set_ylim(0.5, 1.02)
     handles, labels = axes[0, 0].get_legend_handles_labels()
     fig.legend(handles, labels, ncol=len(VARIANTS), fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 0.955))
-    fig.suptitle("Comparison of TCP variants (mean ± std over 5 seeds)", weight="bold")
+    fig.suptitle(f"Comparison of TCP variants (mean ± std over {N_SEEDS} seeds)", weight="bold")
     fig.tight_layout(rect=(0, 0, 1, 0.93))
     fig.savefig(GRAPHS / "comparison_bars.png")
     plt.close(fig)
@@ -115,7 +117,7 @@ def tradeoff_chart(runs):
         ax.set_title(f"{level.capitalize()} congestion", fontsize=10, weight="bold")
         ax.margins(x=0.2)
     axes[0].legend(fontsize=7, loc="upper left")
-    fig.suptitle("Delay vs loss for every variant (mean ± std over 5 seeds; lower-left is better)", weight="bold")
+    fig.suptitle(f"Delay vs loss for every variant (mean ± std over {N_SEEDS} seeds; lower-left is better)", weight="bold")
     fig.tight_layout()
     fig.savefig(GRAPHS / "tradeoff_delay_loss.png")
     plt.close(fig)
@@ -197,7 +199,7 @@ def ablation_chart():
     for ax, values, fmt in [(axes[0], drops, "{:.0f}"), (axes[1], fair, "{:.3f}")]:
         for yi, v in zip(y, values):
             ax.text(v, yi, " " + fmt.format(v), va="center", fontsize=7)
-    fig.suptitle("Ablation at high congestion (mean of 5 seeds): darker green = proposed setting",
+    fig.suptitle(f"Ablation at high congestion (mean of {N_SEEDS} seeds): darker green = proposed setting",
                  weight="bold")
     fig.tight_layout()
     fig.savefig(GRAPHS / "ablation_tradeoff.png")
@@ -248,13 +250,34 @@ def results_page(table):
     avg = runs.groupby(["level", "variant"]).mean(numeric_only=True)
     rel = pd.read_csv(RESULTS / "predictive_vs_baselines.csv").set_index(["level", "vs"])
 
+    net = pd.read_csv(RESULTS / "robustness" / "network_sweep.csv")
+    net_rows = "\n".join(
+        f"| {r.rate_mbps} Mbps | {r.delay_ms} ms | {r[2]:+.0f}% | {r[3]:+.0f}% | {r[4]:.1f}% | "
+        f"{r.jain_predictive:.2f} | {r.jain_reno:.2f} | {r.jain_cubic:.2f} | {r[8]:.0f}% | "
+        f"{r.seeds_fewer_drops}/{N_SEEDS} / {r.seeds_lower_rtt}/{N_SEEDS} |" for r in net.itertuples(index=False))
+    sig = pd.read_csv(RESULTS / "significance.csv")
+    def fmt_p(p):
+        return "< 0.0001" if p < 1e-4 else f"{p:.4f}"
+    sig_rows = "\n".join(
+        f"| {r.level.capitalize()} | {NAMES[r.vs]} | {r.metric} | {r.mean_diff:+.2f} | "
+        f"[{r.ci95_low:+.2f}, {r.ci95_high:+.2f}] | {r.seeds_lower}/{r.seeds} | {fmt_p(r.t_test_p)} | "
+        f"{fmt_p(r.sign_test_p)} |" for r in sig[sig.vs.isin(["reno", "cubic"])].itertuples(index=False))
+    sig_other = sig[~sig.vs.isin(["reno", "cubic"]) & (sig.t_test_p >= 0.05)]
+    sig_other_text = "; ".join(f"{r.level} load vs {NAMES[r.vs]}, {r.metric} ({r.mean_diff:+.2f}, p = {r.t_test_p:.2f})"
+                               for r in sig_other.itertuples(index=False)) or "none"
+    base = pd.read_csv(RESULTS / "model" / "prediction_baselines.csv")
+    base_rows = "\n".join(
+        f"| {r.scope.capitalize()} | {r.model} | {r[2]:.1f}% | {r.high_precision:.3f} | {r.high_recall:.3f} | "
+        f"{r.high_f1:.3f} | {r.balanced_accuracy:.3f} | {r.mcc:.3f} |" for r in base.itertuples(index=False))
+    b = base.set_index(["scope", "model"])
+    n = net.set_index(["rate_mbps", "delay_ms"])
     used = [f for f, imp in metrics["feature_importance"].items() if imp > 0]
     choice = json.loads((RESULTS / "model" / "selection_choice.json").read_text())
     tune = json.loads((RESULTS / "model" / "tuning_choice.json").read_text())
     buffer = pd.read_csv(RESULTS / "robustness" / "buffer_vs_reno.csv")
     buffer_rows = "\n".join(
         f"| {r.queue} | {r.level.capitalize()} | {r[2]:+.1f}% | {r[3]:+.1f}% | {r[4]:.1f}% | {r.jain:.2f} | "
-        f"{r.seeds_fewer_drops}/5 / {r.seeds_lower_rtt}/5 | {r[8]:.0f}% |" for r in buffer.itertuples(index=False))
+        f"{r.seeds_fewer_drops}/{N_SEEDS} / {r.seeds_lower_rtt}/{N_SEEDS} | {r[8]:.0f}% |" for r in buffer.itertuples(index=False))
     big_buffer_reno_mode = buffer.set_index(["queue", "level"]).loc[(100, "high"), "reno_mode_%"]
     nodet = pd.read_csv(RESULTS / "robustness" / "buffer_100_nodetector.csv").iloc[0]
     nodet_drops, nodet_rtt = nodet["drops_vs_reno_%"], nodet["rtt_vs_reno_%"]
@@ -293,11 +316,11 @@ def results_page(table):
         f"| {'**' + r.candidate + '**' if r.candidate == choice['chosen'] else r.candidate} | {r.level.capitalize()} | "
         f"{r.depth:.0f} | {r.leaves:.0f} | {r.drops:+.1f}% | {r.rtt:+.1f}% | {r.goodput:.1f}% | {r.jain:.3f} |"
         for r in sel.itertuples())
-    runs["split"] = np.where(runs.seed <= 3, "1-3 (train)", "4-5 (unseen)")
+    runs["split"] = np.where(runs.seed <= 3, "1-3 (train)", f"4-{N_SEEDS} (unseen)")
     split = runs.groupby(["level", "split", "variant"]).mean(numeric_only=True)
     split_rows = []
     for level in ["medium", "high"]:
-        for sp in ["1-3 (train)", "4-5 (unseen)"]:
+        for sp in ["1-3 (train)", f"4-{N_SEEDS} (unseen)"]:
             p, r = split.loc[(level, sp, "predictive")], split.loc[(level, sp, "reno")]
             split_rows.append(f"| {level.capitalize()} | {sp} | {100 * (p.drops - r.drops) / r.drops:+.1f}% | "
                               f"{100 * (p.mean_rtt_ms - r.mean_rtt_ms) / r.mean_rtt_ms:+.1f}% | "
@@ -327,7 +350,7 @@ def results_page(table):
 
     page = f"""# Results: Lightweight Predictive Congestion Estimator for TCP
 
-Generated by `analysis/make_graphs.py`. All values are the mean over 5 random seeds of 60 s NS-3 simulations
+Generated by `analysis/make_graphs.py`. All values are the mean over {N_SEEDS} random seeds of 60 s NS-3 simulations
 (10 Mbps / 20 ms bottleneck, 50-packet FIFO queue).
 
 ## 1. TCP Variants Compared
@@ -350,11 +373,28 @@ Generated by `analysis/make_graphs.py`. All values are the mean over 5 random se
 |---|---|---|---|---|
 {win_rows}
 
-**Held-out check:** the model was trained (and chosen) on seeds 1-3 only. Results on seeds 1-3 vs the unseen seeds 4-5:
+**Held-out check:** the model was trained (and chosen) on seeds 1-3 only. Results on seeds 1-3 vs the unseen seeds 4-{N_SEEDS}:
 
 | Level | Seeds | Drops vs Reno | RTT vs Reno | Goodput vs Reno | Fairness |
 |---|---|---|---|---|---|
 {split_rows}
+
+### 2.1 Statistical Significance (Phase 12)
+
+Runs are paired by seed (same traffic for every variant). Difference = Predictive minus the baseline, in the metric's
+own unit; 95% confidence interval of the mean per-seed difference; paired t-test (two-sided); exact sign test
+(one-sided, in the direction of the difference). The exact two-sided Wilcoxon
+signed-rank p-value is in `results/significance.csv`; with {N_SEEDS} seeds the smallest possible sign-test p-value is
+{0.5 ** N_SEEDS:.4f}.
+
+| Level | Predictive vs | Metric | Mean difference | 95% CI | Seeds lower | t-test p | Sign test p |
+|---|---|---|---|---|---|---|---|
+{sig_rows}
+
+- **Every drop and RTT improvement over Reno and CUBIC is significant** (confidence intervals far from
+  zero). The small goodput cost is significant too: it is real, but well inside the PRD limit (≥ 90% of Reno).
+- **Against Tahoe, Vegas and BBR** (`results/significance.csv`), the differences that are *not* significant at
+  p < 0.05 are: {sig_other_text}.
 
 ## 3. Loss-Based vs Delay-Based TCP (Vegas, BBR)
 
@@ -426,6 +466,29 @@ levels, then pick the largest average reduction in drops plus RTT. **Chosen: {ch
 
 ![Early warning](graphs/ml_early_warning.png)
 
+### 6.3 Against a Trivial Guess (Phase 10)
+
+{b.loc[("all", "Always High"), "high_share_%"]:.0f}% of the test samples are labelled High (almost all of them at high
+load), so a model that always answers "High" already looks good on accuracy and on the High-class F1. Balanced
+accuracy and the Matthews correlation coefficient (MCC: 0 = no better than a constant guess) cannot be gamed this
+way. The task here is binary: will the bottleneck be congested (High) 0.5 s from now?
+
+| Test samples | Model | Labelled High | Precision (High) | Recall (High) | F1 (High) | Balanced accuracy | MCC |
+|---|---|---|---|---|---|---|---|
+{base_rows}
+
+- **Medium load is where prediction matters**, because congestion comes and goes. There the tree beats the trivial
+  guess (MCC {b.loc[("medium", "Decision Tree"), "mcc"]:.2f}, balanced accuracy
+  {b.loc[("medium", "Decision Tree"), "balanced_accuracy"]:.2f}), but its High-class F1
+  ({b.loc[("medium", "Decision Tree"), "high_f1"]:.3f}) is no better than always answering "High"
+  ({b.loc[("medium", "Always High"), "high_f1"]:.3f}).
+- **At high load there is nothing to predict:** the queue is almost always congested. The tree answers "Medium" for a
+  short time after the queue has been cut, which lowers its recall there; this is the intended control behaviour.
+- **Macro-F1 ({tree["macro_f1"]:.2f}) is held down by the rare Medium class** ({100 * (1 - b.loc[("all", "Always High"), "high_share_%"] / 100):.0f}%
+  of samples are not High, and Medium is the smaller part of those). The ablation (section 7) shows that the
+  reaction to Medium barely changes the results, so the closed-loop numbers in sections 1-2 are the better measure
+  of the predictor; the offline scores should be read with this table next to them.
+
 ## 7. Ablation Study
 
 The competition detector is switched off in these runs, so they measure the prediction mechanism alone
@@ -457,7 +520,7 @@ The single-flow check was added after the first version of the rule chose β = 0
 ### 9.1 Other Buffer Sizes
 
 The model was trained and the controller tuned with a 50-packet queue only (≈ 1.3× the bandwidth-delay product of
-38 packets). Predictive TCP compared with Reno at each queue size (mean of 5 seeds):
+38 packets). Predictive TCP compared with Reno at each queue size (mean of {N_SEEDS} seeds):
 
 | Queue | Level | Drops vs Reno | RTT vs Reno | Goodput vs Reno | Fairness | Seeds with fewer drops / lower RTT | Time in Reno mode (detector) |
 |---|---|---|---|---|---|---|---|
@@ -487,7 +550,7 @@ filling the queue until packets are lost, so the queue never empties and Predict
 the known weakness of delay-based congestion control (Vegas shows it too, at {vegas_share}). Without help,
 Predictive TCP gets only {shares["predictive_nodetector"]:.0f}%.
 
-### 9.3 Competition Detector (Phase 8b)
+### 9.3 Competition Detector (Phase 8b, base RTT fixed in Phase 10)
 
 When only Predictive flows share the link, their cuts let the queue drain now and then. A loss-based sender keeps
 it full until packets drop. So if the lowest RTT over the last *window* stays above *threshold* × base RTT, Predictive
@@ -498,15 +561,45 @@ closest to 50%; within 2 points, the larger drop + RTT reduction. **Chosen: {com
 {comp["window_s"]:.0f} s, threshold {comp["threshold"]}, hold {comp["hold_s"]:.0f} s).
 
 With the detector, Predictive TCP's share against CUBIC rises from {shares["predictive_nodetector"]:.0f}% to
-{shares["predictive"]:.0f}% (all 5 seeds). Settings that reach 40-44% exist, but they also switch to Reno mode when no
-competitor is present (8 Predictive flows plus the UDP traffic keep the queue from fully draining at high load), and
-then lose most of the gains:
+{shares["predictive"]:.0f}%. **Phase 10 fix:** the Phase 8b detector took its base RTT from the lowest *smoothed* RTT and
+reached only {shares["predictive_phase8b"]:.0f}%. Flows that started behind CUBIC's standing queue never saw a smoothed RTT
+near the true 44 ms (they learned 60-85 ms), so their threshold sat above the RTT they measured and they never detected
+the competitor. Given the true base RTT, the share reached about 45% (Reno's level) in a diagnostic run; the realistic
+fix measures the base from raw RTT samples, which catch the brief dips of the queue. Settings with a lower threshold
+or a longer hold can take a larger share, but some of them also switch to Reno mode when no competitor is present
+(8 Predictive flows plus the UDP traffic keep the queue from fully draining at high load) and then lose most of the
+gains:
 
 | Setting | Share vs CUBIC | Reno mode, Predictive flows only (med / high) | Drops vs Reno (med / high) | RTT vs Reno (med / high) | Fairness (high) | Passes rule |
 |---|---|---|---|---|---|---|
 {comp_rows}
 
 ![Competition tuning](graphs/competition_tuning.png)
+
+### 9.4 Other Link Speeds and Delays (Phase 10)
+
+The model was trained and every setting tuned at 10 Mbps with a 20 ms bottleneck delay. Here the high-load scenario
+(8 bulk flows + UDP) runs at 5, 10 and 50 Mbps with a 20 or 100 ms bottleneck delay; the queue is 1.3× the
+bandwidth-delay product in each case (mean of {N_SEEDS} seeds; Reno and CUBIC under the same conditions).
+
+| Link | Bottleneck delay | Drops vs Reno | RTT vs Reno | Goodput vs Reno | Fairness: Predictive | Reno | CUBIC | Time in Reno mode | Seeds with fewer drops / lower RTT |
+|---|---|---|---|---|---|---|---|---|---|
+{net_rows}
+
+- **Drops:** fewer than Reno in every seed at every link speed and delay.
+- **Fairness collapses on fast or long links** (Jain {n.loc[(50, 20), "jain_predictive"]:.2f} at 50 Mbps / 20 ms,
+  {n.loc[(10, 100), "jain_predictive"]:.2f} at 10 Mbps / 100 ms), where Reno stays fair. The cause is delayed ACKs: the
+  receiver ACKs every second segment, so the smoothed RTT of a flow with a small window includes time spent waiting
+  for the ACK. Small flows therefore measure a higher RTT than a big flow on the same path, predict High, cut and stop
+  growing, while the big flow measures a lower RTT and keeps growing. In diagnostic runs at 50 Mbps / 20 ms, turning
+  delayed ACKs off brought fairness back to 0.98, and so did feeding the model the lowest raw RTT of each interval
+  (`MinRttSignal`, off by default). The deployed tree was trained on the smoothed RTT, though. In Phase 11, models
+  retrained on the new signal and tuned on seeds 1-3 were fair at 50 Mbps only with the full feature set and a hard
+  cut, keeping about half of the main gain, so the deployed model was kept (README finding 21).
+- **The detector false-alarms where the queue never drains on its own:** at 5 Mbps / 20 ms (the 2 Mbps UDP flow takes
+  40% of the link) Predictive TCP spends {n.loc[(5, 20), "reno_mode_%"]:.0f}% of the time in Reno mode and keeps only a
+  {n.loc[(5, 20), "drops_vs_reno_%"]:+.0f}% drop change; at 10 Mbps with a 49-packet queue it spends
+  {n.loc[(10, 20), "reno_mode_%"]:.0f}% there (0% with the 50-packet queue it was tuned on).
 """
     (RESULTS / "RESULTS.md").write_text(page)
 

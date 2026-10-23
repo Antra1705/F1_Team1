@@ -107,7 +107,26 @@ def early_warning(test, pred_col, lookback=1.0, interval=0.1):
     return np.array(leads), (100.0 * false_alarms / alarms if alarms else 0.0)
 
 
+def check_selection():
+    """Warn if the model trained here is not the one select_model.py chose inside NS-3.
+
+    The deployed feature set and horizon are set by hand (MODEL_FEATURES above,
+    HORIZON in build_dataset.py) after the selection step, so they can drift apart
+    when the data changes (Phase 10)."""
+    choice_file = MODEL_DIR / "selection_choice.json"
+    if not choice_file.exists():
+        return
+    from ml_experiments import FEATURE_SETS
+    chosen = json.loads(choice_file.read_text())["chosen"]
+    deployed = [f"{name.lower().replace(' ', '_')}_{HORIZON}s" for name, features in FEATURE_SETS.items()
+                if features == MODEL_FEATURES]
+    if chosen not in deployed:
+        print(f"WARNING: select_model.py chose {chosen}, but this script trains {deployed or MODEL_FEATURES} "
+              f"with a {HORIZON} s horizon; update MODEL_FEATURES / HORIZON")
+
+
 def main():
+    check_selection()
     MODEL_DIR.mkdir(parents=True, exist_ok=True)
     GRAPHS.mkdir(parents=True, exist_ok=True)
     data = pd.read_csv(DATASET)

@@ -3,7 +3,7 @@
 __pycache__/
 .DS_Store
 
-# Raw simulation output and intermediate data: about 200 MB, all regenerated
+# Raw simulation output and intermediate data: about 360 MB, all regenerated
 # exactly by ./run_all.sh. Summary tables, graphs and RESULTS.md are kept.
 results/raw/
 results/validation/
@@ -13,6 +13,8 @@ results/competition_tuning/
 results/model_selection/
 results/robustness/queue*/
 results/robustness/mixed*/
+results/robustness/network/
+results/signal_tradeoff/
 results/dataset.csv
 results/model/test_predictions.csv
 

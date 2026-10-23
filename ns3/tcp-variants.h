@@ -112,6 +112,9 @@ class TcpPredictive : public TcpLinuxReno
     Time m_compWindow;      //!< Competition detector window (0 = detector off)
     double m_compThreshold; //!< RTT floor / base RTT above which a competitor is assumed
     Time m_compHold;        //!< Stay in competitive mode this long after the last evidence
+    bool m_detectorRawBase;  //!< Detector base RTT from raw samples (Phase 10)
+    bool m_minRttSignal;     //!< Model features from the per-interval minimum raw RTT (Phase 10)
+    double m_rawMinRttMs{0}; //!< Lowest raw RTT sample seen
     Time m_lastCompEvidence{Seconds(-1000)}; //!< When the queue was last seen not draining
     bool m_competitive{false};          //!< Behaving like plain Reno (competitor present)
     double m_intervalMinRttMs{0};       //!< Lowest RTT sample since the last evaluation

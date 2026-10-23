@@ -2,7 +2,7 @@
 
 **For:** Claude (or anyone) picking this project up again, for example after cloning it from GitHub.
 **Start here:** read this file, then `README.md`, then `docs/PROJECT_PLAN.md` (sections 0 and 12).
-**Last updated:** 13 Oct 2026, after Phase 8b.
+**Last updated:** 23 Oct 2026, after Phase 13 (10 seeds).
 
 ---
 
@@ -14,22 +14,24 @@
 - **Proposed variant:** *Predictive TCP*, which uses that tree inside the sender to back off before the queue overflows.
 - **User preferences:** work in phases, one phase per request ("build phase N"). Be honest about weak results; never overclaim.
 
-**Final results so far** (5 seeds, compared with Reno; full tables in `results/RESULTS.md`):
+**Final results so far** (10 seeds, compared with Reno; full tables in `results/RESULTS.md`):
 
 | | Medium load | High load |
 |---|---|---|
-| Drops | −91% | −90% |
-| RTT | −26% | −37% |
-| Goodput | 98.0% | 99.6% |
-| Fairness (Jain) | 0.98 | 0.96 |
+| Drops | −93% | −90% |
+| RTT | −28% | −36% |
+| Goodput | 97.4% | 99.6% |
+| Fairness (Jain) | 0.99 (Reno 0.99) | 0.95 (Reno 1.00) |
 
 - **Single flow:** Predictive TCP reaches 9.7 Mbps; Reno reaches 9.0.
-- **Held-out seeds:** seeds 4–5 show the same gains.
+- **Held-out seeds:** seeds 4–10 show the same gains (drops −94% / −90%, RTT −29% / −36%). Every drop and RTT gain vs Reno and CUBIC: p < 0.0001.
 - **PRD criteria:**
   - Section 10.3 (Predictive TCP vs Reno and CUBIC): all 9 met.
   - Section 10.2 (prediction quality): 3 of 4 met. Macro-F1 is 0.61, against a target of 0.70.
-- **Main weakness:** when sharing the link with CUBIC, Predictive TCP gets 23% of the bandwidth without the detector, and 36% with it (unseen seeds: 22% → 35%).
-- **Detector weakness:** with a 100-packet buffer, the detector false-alarms (README finding 16).
+- **Main weaknesses:**
+  - **Sharing with CUBIC:** Predictive TCP gets 23% of the bandwidth without the detector and 40% with it (unseen seeds 4–10: 23% → 38%). It was 33% before the Phase 10 base-RTT fix (10 seeds).
+  - **Detector false alarms** where the queue never drains on its own: 100-packet buffer, 5 Mbps (README finding 16).
+  - **Unfair on fast or long links** (Jain 0.41 at 50 Mbps), caused by delayed ACKs (README finding 18).
 
 ---
 
@@ -47,11 +49,42 @@
 | 8 | Robustness: buffer sweep (20/50/100 packets) + competition with CUBIC | ✅ |
 | 8b | Competition detector (fix for losing to CUBIC) | ✅ (verified reproducible) |
 | App | Interactive simulator (Streamlit, `app/`) | ✅ Tested headless and in Chrome |
+| 10 | Weaknesses re-examined: detector base-RTT fix, link sweep, trivial-guess comparison | ✅ (see 3.0) |
+| 12 | Significance: `analysis/significance.py` (paired t-test, 95% CI, sign test), RESULTS 2.1, in `run_all.sh`; 29 data files in the reference | ✅ |
+| 11 | Fairness vs gain: 6 models × 18 settings with a 50 Mbps fairness limit; deployed model kept | ✅ (see 3.0b) |
+| 13 | 10 seeds: every evaluation repeated on seeds 1–10 (seeds 6–10 new, never used for any choice); reference rebuilt | ✅ (see 3.0c) |
 | 9 | Report + presentation | ⬜ Not started; format not yet chosen |
 
 ---
 
 ## 3. Exactly What Is Left
+
+### 3.0 Phase 10: Done (23 Oct 2026)
+
+- **Detector fix:** `DetectorRawBase` (default on) takes the base RTT from raw RTT samples. Phase 8b's smoothed base made late-starting flows learn 60–85 ms instead of 44 ms, so they never detected CUBIC. Re-tuned with the unchanged rule: `w2s_t1.4_h5s` (hold 5 s, was 10 s). Share vs CUBIC 36% → 41%, all 5 seeds better. A comparison row "Phase 8b detector" is in `mixed_competition.csv` (`results/robustness/mixed_phase8b/`).
+- **Main results byte-identical** to Phase 8b (final table, model, tuning, ablation, PRD checks). Changed: competition tuning, mixed competition, buffer sweep (100-packet false alarm now 54% Reno mode, drops −54%).
+- **New:** link sweep (`results/robustness/network/`, `network_sweep.csv`, RESULTS 9.4); `analysis/prediction_baselines.py` (RESULTS 6.3); README findings 17–20.
+- **Experimental, off by default:** `MinRttSignal` (lowest raw RTT per interval as the model input). See 3.0b.
+- **Rejected experiments:** detector evidence gated on recent loss (worse share).
+- **Reference rebuilt:** archive 24 MB (Phase 11), 28 data files + 18 graphs in `SHA256SUMS`.
+
+### 3.0b Phase 11: Done (23 Oct 2026)
+
+- **Question:** can Predictive TCP be fair on fast links (Phase 10: Jain 0.45 at 50 Mbps) and keep its gains?
+- **Code kept:** the sample logger writes two extra columns (`rtt_min_int_ms`, `raw_min_rtt_ms`); `build_dataset.py` has `RTT_SIGNAL` (env, default `smoothed`, byte-identical dataset). Every result table is unchanged.
+- **Experiment:** `analysis/signal_tradeoff.py` (optional, ~40 min, not in `run_all.sh`). 6 models × the Phase 7 grid, seeds 1–3, rule fixed before running with an extra limit Jain ≥ 0.9 at 50 Mbps / 20 ms. Table: `results/model/signal_tradeoff.csv`.
+- **Result:** the deployed model fails 50 Mbps fairness at every eligible setting (0.24–0.74). The rule's pick (min signal, full set 0.2 s, β 0.5, MinWindow 2) is fair (0.92) but keeps about half the gain (drops −53% / −69%, RTT −6% / −9% vs −92% / −90%, −26% / −36%).
+- **Decision (user's choice):** keep the deployed model; the 50 Mbps limit was dropped after seeing its price, stated openly in README finding 21.
+- **Correction made:** README finding 18 previously quoted "−74% / −25%" for a retrained model; that run used untuned controller defaults, so it was replaced by the Phase 11 result.
+- **Next idea, not tried:** a per-flow queue-share target (Vegas / FAST / Copa style) instead of the same multiplicative cut for every flow.
+
+### 3.0c Phase 13: Done (23 Oct 2026)
+
+- **What changed:** `SEEDS` in `run_baseline.sh`, `run_predictive.sh`, `run_robustness.sh` (env-overridable, default `1 … 10`), `compare_variants.py`, `robustness.py` and `make_graphs.py` (`N_SEEDS`). The dataset, model, model selection and all tuning still use seeds 1–3 / 1–5 and are byte-identical; no choice was re-made.
+- **Results (10 seeds):** drops −93% / −90%, RTT −28% / −36%, goodput 97.4% / 99.6%, Jain 0.99 / 0.95; all 9 PRD criteria met. Seed wins 10/10 vs Tahoe, Reno, CUBIC, BBR for drops and RTT at both loads. vs Vegas: medium drops 0/10 (Vegas lower), high drops 7/10 (p = 0.08), RTT 10/10.
+- **Significance:** all Reno/CUBIC drop and RTT comparisons p < 0.0001 (Wilcoxon 0.002, sign 0.001). Medium goodput cost −0.22 Mbps (p = 0.009). `significance.csv` now also has `wilcoxon_p`.
+- **Shifts vs 5 seeds, stated openly:** share vs CUBIC 41% → 40% (Phase 8b 33%, Phase 10 better in 10/10, p = 0.0006); 100-packet / high-load false alarm worse (71% Reno mode, drops −40%, RTT −13%; detector off −86% / −49%).
+- **Runtime:** `run_all.sh` ~28 min (step 2 is 150 runs).
 
 ### 3.1 Phase 8b: Done
 
@@ -64,7 +97,7 @@
 
 **One check may still be pending:** the final end-to-end reproducibility run.
 1. Record the md5 of these files: `results/final_table.md`, `results/model/metrics.json`, `results/comparison_runs.csv`, `results/model/selection.csv`, `results/model/tuning.csv`, `results/model/competition_tuning.csv`, `results/ablation_summary.csv`, `results/robustness/buffer_sweep.csv`, `results/robustness/mixed_competition.csv`, `ns3/predictive-model.h` and `results/RESULTS.md`.
-2. Run `./run_all.sh` (about 18 minutes).
+2. Run `./run_all.sh` (about 28 minutes).
 3. Compare the md5s.
 4. In zsh, list the files explicitly; a variable holding the list is not split into separate names.
 5. If the check is marked as passed in the line below, skip this.
@@ -125,7 +158,7 @@ The user wanted results equal to macOS everywhere.
 **Why re-simulation can't do it:** a re-simulation cannot be bit-identical across OS, compiler or CPU. libm, clang/gcc and ARM/x86 differ in the last bit, and the simulation amplifies it.
 
 **The solution:**
-- **`reference/simulation_data.tar.xz`** (15 MB, xz -9): all NS-3 output from the verified Mac run.
+- **`reference/simulation_data.tar.xz`** (39 MB since Phase 13, 10 seeds, xz -9): all NS-3 output from the verified Mac run.
 - **`reference/expected/`:** the 24 result tables, `RESULTS.md` and the header.
 - **`reference/SHA256SUMS`:** checksums of results, dataset, graphs and the archive.
 
@@ -133,7 +166,7 @@ The user wanted results equal to macOS everywhere.
 - **`./run_all.sh --reference`** checks the archive checksum, unpacks it into `results/`, sets `PTCP_REFERENCE=1` and skips all NS-3 runs and builds. In `select_model.py`, `tune_controller.py` and `tune_competition.py` the `ns3_run` and build calls are gated by this variable.
 - **`analysis/verify_reference.py --strict`** runs at the end. Normal mode also runs the verifier, without `--strict`, as a report.
 
-**Tested:** a fresh-clone copy (19 MB) with `NS3_DIR=/nonexistent` gave 26/26 data files and 18/18 graphs identical, in about 1 minute.
+**Tested (Phase 13):** a fresh-clone copy (61 MB) with `NS3_DIR=/nonexistent` gave 29/29 data files and 18/18 graphs identical, in 58 s. The full 10-seed `./run_all.sh` took 28 min.
 
 **If the Mac results are ever regenerated on purpose** (code change), rebuild `reference/` (archive, expected/ and SHA256SUMS) from the new verified results.
 
@@ -165,7 +198,7 @@ The user wanted results equal to macOS everywhere.
 
 ## 4. Rules This Project Follows (do not break them)
 
-- **Seeds 1–3 for every choice; seeds 4–5 only for final numbers.** This applies to model selection (Phase 6), controller tuning (Phase 7) and detector tuning (Phase 8b).
+- **Seeds 1–3 for every choice; seeds 4–10 only for final numbers.** This applies to model selection (Phase 6), controller tuning (Phase 7) and detector tuning (Phase 8b).
 - **Selection rules are written in the script before running.** If a rule is changed after seeing a result, say so openly in the code docstring and the README (as was done for the Phase 7 single-flow check).
 - **Earlier phases are pinned to their settings so the pipeline reproduces:**
   - `select_model.py` passes Beta 0.85, MinWindow 4 and CompetitionWindow 0s.
@@ -182,7 +215,7 @@ The user wanted results equal to macOS everywhere.
 1. **Build tools and NS-3.48** in `~/ns-3`, using the commands in the README "Setup" section (`brew install cmake ninja`, then download, configure with the module list, and build). If NS-3 lives elsewhere, set `NS3_DIR`.
 2. **Python environment:** `uv venv .venv && uv pip install -r requirements.txt`.
 3. **Compile:** `./build.sh` copies `ns3/` into `~/ns-3/scratch/tcp-predictor` and compiles it.
-4. **Regenerate everything:** `./run_all.sh`, about 17 minutes. This recreates every ignored results folder.
+4. **Regenerate everything:** `./run_all.sh`, about 28 minutes. This recreates every ignored results folder.
 5. **PDFs of the plan and PRD:**
    ```bash
    python3 -m venv /tmp/mdvenv && /tmp/mdvenv/bin/pip install markdown

@@ -1,7 +1,7 @@
 """Phases 3 and 5: compare Predictive TCP with Tahoe, Reno, CUBIC, Vegas and BBR.
 
 Reads every run in results/raw (and results/ablation), computes per-run
-metrics, averages them over the 5 seeds, checks the PRD success criteria
+metrics, averages them over the 10 seeds, checks the PRD success criteria
 (section 10.3) and writes CSV tables to results/.
 
 Usage: .venv/bin/python analysis/compare_variants.py
@@ -21,7 +21,7 @@ OUT = ROOT / "results"
 VARIANTS = ["tahoe", "reno", "cubic", "vegas", "bbr", "predictive"]
 BASELINES = ["tahoe", "reno", "cubic", "vegas", "bbr"]
 LEVELS = ["low", "medium", "high"]
-SEEDS = [1, 2, 3, 4, 5]
+SEEDS = list(range(1, 11))  # 1-3 train/tune, 4-10 evaluation only (6-10 since Phase 13)
 SIM_TIME = 60.0
 METRICS = ["goodput_mbps", "mean_rtt_ms", "drops", "retransmissions", "mean_queue_pkts", "jain_fairness"]
 
@@ -61,7 +61,7 @@ def main():
     summary = mean.join(std, rsuffix="_std")
     summary.round(3).to_csv(OUT / "comparison_summary.csv")
 
-    print("Mean over 5 seeds:")
+    print(f"Mean over {len(SEEDS)} seeds:")
     print(mean.round(2).to_string())
 
     # ---- PRD section 10.3 success criteria (Medium and High levels) --------
@@ -119,7 +119,7 @@ def main():
             })
     wins = pd.DataFrame(wins)
     wins.to_csv(OUT / "seed_wins.csv", index=False)
-    print("\nSeeds (out of 5) where Predictive TCP is better:")
+    print(f"\nSeeds (out of {len(SEEDS)}) where Predictive TCP is better:")
     print(wins.to_string(index=False))
 
     # ---- Ablation ---------------------------------------------------------
@@ -139,7 +139,7 @@ def main():
         abl = pd.DataFrame(abl).groupby(["level", "setting"], sort=False)[
             ["goodput_mbps", "mean_rtt_ms", "drops", "jain_fairness", "proactive_reductions"]].mean()
         abl.round(2).to_csv(OUT / "ablation_summary.csv")
-        print("\nAblation (mean over 5 seeds):")
+        print(f"\nAblation (mean over {len(SEEDS)} seeds):")
         print(abl.round(2).to_string())
 
     (OUT / "comparison_overview.json").write_text(json.dumps({

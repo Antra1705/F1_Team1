@@ -1,11 +1,11 @@
 level,setting,goodput_mbps,mean_rtt_ms,drops,jain_fairness,proactive_reductions
-medium,"proposed (beta 0.8, MinWindow 4)",8.16,59.21,61.2,0.98,1068.4
-high,"proposed (beta 0.8, MinWindow 4)",8.62,64.41,163.0,0.95,1492.4
-medium,no proactive cut (beta 1.0),8.25,76.15,299.8,0.98,0.0
-high,no proactive cut (beta 1.0),8.67,106.09,266.6,0.82,0.0
-medium,before tuning (beta 0.85),8.14,60.4,82.0,0.98,1176.6
-high,before tuning (beta 0.85),8.63,67.11,195.6,0.93,1541.4
-medium,"halve on High (beta 0.5, MinWindow 6)",8.21,57.3,15.4,0.98,670.2
-high,"halve on High (beta 0.5, MinWindow 6)",8.61,68.73,184.8,0.99,308.4
-medium,no reaction to Medium,8.15,59.32,63.6,0.98,1074.8
-high,no reaction to Medium,8.61,64.23,178.0,0.95,1508.8
+medium,"proposed (beta 0.8, MinWindow 4)",8.27,58.73,46.2,0.99,1129.6
+high,"proposed (beta 0.8, MinWindow 4)",8.62,64.96,163.5,0.95,1525.0
+medium,no proactive cut (beta 1.0),8.25,75.33,245.3,0.98,0.0
+high,no proactive cut (beta 1.0),8.67,107.16,275.8,0.83,0.0
+medium,before tuning (beta 0.85),8.29,60.0,60.6,0.98,1216.4
+high,before tuning (beta 0.85),8.64,67.96,172.9,0.93,1512.3
+medium,"halve on High (beta 0.5, MinWindow 6)",8.35,56.52,7.7,0.99,737.4
+high,"halve on High (beta 0.5, MinWindow 6)",8.62,68.9,188.2,0.98,334.8
+medium,no reaction to Medium,8.29,58.71,47.4,0.99,1153.5
+high,no reaction to Medium,8.62,65.18,169.9,0.95,1504.3

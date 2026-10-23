@@ -47,6 +47,9 @@ struct FlowState
     bool traced = false;
     double srttMs = 0;
     double minRttMs = 0;
+    double rawMinRttMs = 0;       // lowest raw RTT sample so far
+    double intervalMinRttMs = 0;  // lowest raw RTT sample in the current interval
+    double lastIntervalMinMs = 0; // last interval that had a sample
     uint32_t cwnd = 0;
     uint64_t rxBytes = 0;
     uint64_t lastRxBytes = 0;
@@ -81,6 +84,19 @@ RttTrace(uint32_t i, Time, Time newVal)
     {
         g_flows[i].minRttMs = ms;
     }
+}
+
+void
+LastRttTrace(uint32_t i, Time, Time newVal)
+{
+    double ms = newVal.GetSeconds() * 1000.0;
+    if (ms <= 0)
+    {
+        return;
+    }
+    FlowState& f = g_flows[i];
+    f.intervalMinRttMs = (f.intervalMinRttMs == 0) ? ms : std::min(f.intervalMinRttMs, ms);
+    f.rawMinRttMs = (f.rawMinRttMs == 0) ? ms : std::min(f.rawMinRttMs, ms);
 }
 
 void
@@ -149,6 +165,7 @@ ConnectSocketTraces(uint32_t flow, uint32_t nodeId)
 {
     std::string base = "/NodeList/" + std::to_string(nodeId) + "/$ns3::TcpL4Protocol/SocketList/0/";
     Config::ConnectWithoutContext(base + "RTT", MakeBoundCallback(&RttTrace, flow));
+    Config::ConnectWithoutContext(base + "LastRTT", MakeBoundCallback(&LastRttTrace, flow));
     Config::ConnectWithoutContext(base + "CongestionWindow", MakeBoundCallback(&CwndTrace, flow));
     Config::ConnectWithoutContext(base + "CongState", MakeBoundCallback(&CongStateTrace, flow));
     Config::ConnectWithoutContext(base + "Retransmission", MakeBoundCallback(&RetxTrace, flow));
@@ -180,15 +197,22 @@ Sample(double stopTime)
             f.lastLossTime < 0 ? kSinceLossCap : std::min(kSinceLossCap, now - f.lastLossTime);
         f.lastRxBytes = f.rxBytes;
 
+        if (f.intervalMinRttMs > 0)
+        {
+            f.lastIntervalMinMs = f.intervalMinRttMs;
+        }
         if (f.traced && f.srttMs > 0)
         {
             g_samples << std::fixed << std::setprecision(3) << now << "," << i << "," << f.srttMs
                       << "," << f.minRttMs << "," << f.cwnd << "," << thrMbps << ","
                       << f.retxInterval << "," << lossShort << "," << f.lossTimes.size() << ","
                       << g_queueMaxInterval
-                      << "," << g_queueCap << "," << g_dropsInterval << "," << sinceLoss << "\n";
+                      << "," << g_queueCap << "," << g_dropsInterval << "," << sinceLoss << ","
+                      << (f.lastIntervalMinMs > 0 ? f.lastIntervalMinMs : f.srttMs) << ","
+                      << (f.rawMinRttMs > 0 ? f.rawMinRttMs : f.minRttMs) << "\n";
         }
         f.retxInterval = 0;
+        f.intervalMinRttMs = 0;
     }
     g_queueMaxInterval = g_queueNow;
     g_dropsInterval = 0;
@@ -472,7 +496,7 @@ main(int argc, char* argv[])
                       std::to_string(seed);
     g_samples.open(outDir + "/samples_" + tag + ".csv");
     g_samples << "time,flow,srtt_ms,min_rtt_ms,cwnd_bytes,thr_mbps,retx,loss_events_05s,"
-                 "loss_events_2s,queue_pkts,queue_cap,drops,since_loss_s\n";
+                 "loss_events_2s,queue_pkts,queue_cap,drops,since_loss_s,rtt_min_int_ms,raw_min_rtt_ms\n";
     Simulator::Schedule(Seconds(kSampleInterval), &Sample, simTime);
     if (g_traceCwnd)
     {

@@ -1,0 +1,7 @@
+scope,model,high_share_%,macro_f1_3class,high_precision,high_recall,high_f1,balanced_accuracy,mcc
+all,Decision Tree,75.345,0.605,0.905,0.863,0.883,0.793,0.561
+all,Always High,75.345,0.286,0.753,1.0,0.859,0.5,0.0
+medium,Decision Tree,58.518,0.505,0.696,0.789,0.739,0.651,0.315
+medium,Always High,58.518,0.246,0.585,1.0,0.738,0.5,0.0
+high,Decision Tree,99.79,0.312,0.998,0.884,0.937,0.452,-0.014
+high,Always High,99.79,0.499,0.998,1.0,0.999,0.5,0.0
