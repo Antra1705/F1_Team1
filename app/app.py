@@ -385,8 +385,7 @@ if "last" in st.session_state:
         occupancy = _samples.drop_duplicates("time").queue_pkts.mean()
 
 st.markdown(f"""
-<div class="dateline"><span>BCSE308L Computer Networks</span><span>NS-3.48 discrete-event simulation</span>
-  <span>Antra · 24BDS0066</span></div>
+<div class="dateline"><span>BCSE308L Computer Networks</span><span>NS-3.48 discrete-event simulation</span></div>
 <div class="masthead">
   <div>
     <h1><span class="hl">Predictive</span> TCP</h1>
