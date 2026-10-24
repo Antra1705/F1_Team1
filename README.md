@@ -1,12 +1,12 @@
-# Lightweight Predictive Congestion Estimator for TCP: 
+# Lightweight Predictive Congestion Estimator for TCP
 
 A college networking project that compares **TCP Tahoe, Reno, CUBIC, Vegas and BBR** in NS-3, trains a **lightweight decision tree** to predict bottleneck congestion **0.5 s before it happens**, and uses that prediction inside a new TCP variant, **Predictive TCP**. Predictive TCP backs off *before* the router queue overflows.
 
 **Authors:** Antra (24BDS0066) · Anuska Sen (24BCE2219) · Varshini Harikrishna (24BCE0780)  
 **Course:** BCSE308L Computer Networks, VIT  
-**Tools:** NS-3.48 (C++), Python 3.13, scikit-learn, pandas, NumPy, Matplotlib, Streamlit (interactive app)
+**Stack:** NS-3.48 (C++), Python 3.13, scikit-learn (decision tree), pandas, NumPy, SciPy, Matplotlib, Streamlit ([details](#tech-stack))
 
-**Contents:** [About](#about-the-project) · [What was done](#what-was-done) · [How to run](#how-to-run) · [Results](#headline-results) · [How it works](#how-predictive-tcp-works) · [Setup](#setup-step-by-step) · [Running](#running-the-experiments) · [Same results on every OS](#getting-results-identical-to-macos-on-any-system) · [Interactive app](#interactive-simulator-app) · [Troubleshooting](#troubleshooting) · [Findings](#key-findings-and-design-decisions) · [Limitations](#limitations)
+**Contents:** [About](#about-the-project) · [Use cases](#use-cases) · [Tech stack](#tech-stack) · [What was done](#what-was-done) · [How to run](#how-to-run) · [Results](#headline-results) · [How it works](#how-predictive-tcp-works) · [Project structure](#project-structure) · [Setup](#setup-step-by-step) · [Running](#running-the-experiments) · [Same results on every OS](#getting-results-identical-to-macos-on-any-system) · [Interactive app](#interactive-simulator-app) · [Troubleshooting](#troubleshooting) · [Experiment setup](#experiment-setup) · [Findings](#key-findings-and-design-decisions) · [Limitations](#limitations)
 
 ---
 
@@ -35,6 +35,49 @@ Fewer drops mean fewer retransmissions and less wasted bandwidth. A shorter queu
 
 ---
 
+## Use Cases
+
+### Where Predictive TCP fits
+
+Predictive TCP trades a little throughput for far fewer losses and a much shorter queue. That suits:
+
+- **Latency-sensitive traffic:** video calls, cloud gaming, interactive web pages and request/response (RPC) traffic, where a full router queue adds tens of milliseconds to every packet.
+- **Links with large buffers ("bufferbloat"):** the bigger the queue, the bigger the gain, because loss-based TCP fills whatever buffer exists. With a 100-packet queue at medium load, the RTT is 45% lower than Reno's.
+- **Networks where most senders behave alike:** data centres, campus or enterprise networks and private WANs, where one operator chooses the congestion control for every host.
+- **Senders with little computing power:** the model is 4 `if/else` rules, so it costs almost nothing per connection.
+
+### Where it does not fit (yet)
+
+- **The open Internet, next to CUBIC:** it gets 40% of the bandwidth against CUBIC instead of a fair 50% (finding 15).
+- **Very fast or very long links:** at 50 Mbps, or with 100 ms delay, the flows share unfairly (finding 18).
+- **Real deployment:** everything here is simulated. A real kernel implementation and real-network tests were not part of the project ([Limitations](#limitations)).
+
+### What the repository is useful for
+
+- **Learning TCP congestion control:** six TCP variants run side by side on the same traffic, and the [interactive app](#interactive-simulator-app) shows their queue, RTT and window live.
+- **A template for machine learning inside a network protocol:** labels taken from the future, features the sender can measure itself, models chosen by testing them *inside* the simulator, and an automatic, verified export of the model to C++.
+- **A reproducible baseline for delay-based congestion control research:** one command regenerates every number and graph, byte for byte.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Used for |
+|---|---|---|
+| Network simulation | **NS-3.48** (C++20), built with CMake + Ninja | The dumbbell network, every TCP variant, 100 ms tracing (`ns3/`) |
+| TCP variants | **C++** classes written here: `TcpTahoe`, `TcpReno`, `TcpPredictive`. NS-3 built-ins: `TcpCubic`, `TcpVegas`, `TcpBbr` | The 5 baselines and the proposed variant |
+| Machine-learning model | **scikit-learn 1.9.1**, `DecisionTreeClassifier` (depth 2, 4 leaves). A **single decision tree, not a random forest** | Predicts congestion 0.5 s ahead. Compared with `LogisticRegression` and a loss-based rule |
+| Model deployment | `analysis/export_tree.py` generates **C++ code** (`ns3/predictive-model.h`) and checks it against scikit-learn | Runs the tree inside the simulated TCP sender |
+| Data analysis | **Python 3.13**, pandas 3.0.6, NumPy 2.5.4, SciPy 1.18.1 | Dataset, tuning, metrics, significance tests (`analysis/`) |
+| Graphs | **Matplotlib 3.11.2** | Every graph in `results/graphs/` |
+| Interactive app | **Streamlit 1.65** with Altair charts, Python 3.12 (own environment) | Runs real NS-3 simulations live in the browser (`app/`) |
+| Automation | **bash** scripts, **uv** for Python environments | `build.sh`, `run_all.sh` and the `run_*.sh` experiment scripts |
+| Reproducibility | `reference/` archive, `SHA256SUMS`, `analysis/verify_reference.py` | Identical results on macOS, Linux and Windows (WSL2) |
+
+All Python versions are pinned in `requirements.txt` and `app/requirements.txt`.
+
+---
+
 ## What Was Done
 
 The project was built in phases. Each one was checked before moving on, and every result can be reproduced exactly with `./run_all.sh`.
@@ -43,7 +86,7 @@ The project was built in phases. Each one was checked before moving on, and ever
 |---|---|---|
 | **1. Simulation** | Built a dumbbell network in NS-3 (senders → router → 10 Mbps / 20 ms bottleneck → router → receiver) with low, medium and high congestion. NS-3 has no Tahoe or classic Reno, so both were **written from scratch** as C++ classes. | 45 baseline runs; Tahoe/Reno behaviour validated with window traces |
 | **2. Dataset + ML** | Logged every flow every 100 ms (RTT, window, losses) and labelled each moment with the **real router queue 0.5 s later**. Trained a Decision Tree and compared it with Logistic Regression and a simple loss-counting rule. The tree is exported automatically to C++. | 106,354 samples; the C++ export matches scikit-learn on all 42,235 test samples |
-| **3. Predictive TCP** | Wrote `TcpPredictive`, a new TCP version that runs the tree inside the sender and reduces its window on a "High" prediction. Found and fixed two real problems: a **feedback loop** (the model reacting to its own slowdown) and a **delayed-ACK trap** at very small windows. | All 9 success criteria in the PRD met |
+| **3. Predictive TCP** | Wrote `TcpPredictive`, a new TCP version that runs the tree inside the sender and reduces its window on a "High" prediction. Found and fixed two real problems: a **feedback loop** (the model reacting to its own slowdown) and a **delayed-ACK trap** at very small windows. | All 9 success criteria met |
 | **4. Results** | Graphs, the final comparison table, the results page (`results/RESULTS.md`) and the one-command pipeline (`run_all.sh`). | Whole project reproducible, byte-for-byte |
 | **5. Stronger baselines** | Added **Vegas** (delay-based) and **BBR** (Google's model-based TCP). | Beats BBR on every metric; Vegas remains the strongest rival |
 | **6. Stronger ML** | Added RTT-trend features, compared prediction horizons (0.2 / 0.5 / 1.0 s), and chose the model by **testing 5 candidates inside the simulator**, not by offline accuracy alone. | Drops −88%, RTT −24% to −34% vs Reno |
@@ -55,12 +98,10 @@ The project was built in phases. Each one was checked before moving on, and ever
 | **12. Significance** | Paired t-tests, 95% confidence intervals and exact sign tests over the seeds. | Every drop and RTT gain over Reno and CUBIC is significant (p ≤ 0.005 with 5 seeds); the 2% goodput cost is real but small |
 | **13. 10 seeds** | Every evaluation (comparison, ablation, robustness, competition, link sweep) repeated on 10 seeds instead of 5; seeds 6–10 are new and never used for any choice. | Same picture with tighter intervals: drops −93% / −90%, RTT −28% / −36%, every gain significant at p < 0.0001; vs CUBIC 40% |
 | **App** | An interactive web app (Streamlit) that runs real NS-3 simulations live in the browser, for demos. | `./app/run_app.sh` |
-| **9. Report + slides** | Not started yet. | – |
 
 **Rules followed throughout:**
 - **No peeking at the test data:** every choice (model, settings, detector) was made on seeds 1–3, and seeds 4–10 were kept untouched for the final numbers (seeds 6–10 were added in Phase 13).
 - **No hiding weaknesses:** every weakness found is reported in [Key findings](#key-findings-and-design-decisions) and [Limitations](#limitations).
-- **Planning documents:** [`docs/PROJECT_PLAN.md`](docs/PROJECT_PLAN.md) and [`docs/PRD.md`](docs/PRD.md); [`HANDOFF.md`](HANDOFF.md) says exactly where the project stands.
 
 ---
 
@@ -108,7 +149,6 @@ Only what your option needs. Exact commands per OS are in [Setup](#setup-step-by
 | C++ compiler (clang or g++ 11+), CMake 3.13+, Ninja | C, D, E | macOS: `xcode-select --install` + `brew install cmake ninja`; Linux: `sudo apt install g++ cmake ninja-build` |
 | NS-3.48 in `~/ns-3` (~190 MB, 10–15 min build) | C, D, E | [Setup, Step 3](#step-3-install-ns-348-about-1015-minutes-once) |
 | Streamlit (own environment `app/.venv`) | D | `pip install -r app/requirements.txt` (command in D below) |
-| `markdown` package + Google Chrome | only to regenerate the doc PDFs | [Regenerating the PDFs](#regenerating-the-pdf-versions-of-the-docs) |
 | WSL2 with Ubuntu | Windows only | `wsl --install -d Ubuntu-24.04`, then follow the Linux rows ([details](#windows-1011-via-wsl2)) |
 
 ### 4. Run it
@@ -171,7 +211,7 @@ Mean of 10 seeds, 60 s simulations, 10 Mbps / 20 ms bottleneck, 50-packet FIFO q
 - **Statistically significant:** paired by seed, every drop and RTT improvement over Reno and CUBIC has p < 0.0001 (paired t-test; Wilcoxon p = 0.002, its smallest possible value with 10 seeds) and a 95% confidence interval far from zero; e.g. high-load RTT vs Reno −36.5 ms [−38.1, −34.9]. The ~2.6% goodput cost at medium load is significant too (p = 0.009), so it is a real but small cost (RESULTS section 2.1).
 - **Not overfitted:** the model was trained and chosen, and the controller tuned, on seeds 1–3 only. On the 7 unseen seeds 4–10 the gains are the same size (drops −94% / −90%, RTT −29% / −36%).
 - **Alone on the link** it reaches 9.7 Mbps of 10 (Reno 9.0).
-- **All 9 success criteria** in the PRD (section 10.3) are met.
+- **All 9 success criteria** (listed in `results/RESULTS.md`, section 2) are met.
 - **Costs:** about 2.6% less goodput at medium load (9 of 10 seeds within 5% of Reno), and slightly lower fairness at high load (0.95 vs 1.00).
 - **Other buffer sizes:** with a 20- or 100-packet queue (trained on 50 only), it still has fewer drops and a lower RTT than Reno in every seed. At 20 packets: drops −88% / −89%, RTT −11% / −16%. At 100 packets the RTT gain is largest at medium load (−45%), but at high load the competition detector false-alarms and the gain shrinks to drops −40% / RTT −13% (−86% / −49% with the detector off; finding 16).
 - **Main weakness: it loses bandwidth to CUBIC.** When 4 Predictive TCP flows share the link with 4 CUBIC flows (fair = 50%):
@@ -207,6 +247,7 @@ Every 100 ms the sender measures its own RTT and runs this tree. The tree was le
 - **How the model was chosen:** 5 candidate models (different feature sets and horizons) were compiled into NS-3 and tested on the training seeds. The one with the largest drop and RTT reduction was chosen (Phase 6). It was *not* the best on offline scores (finding 11).
 - **How the reaction was tuned:** the size of the cut (β = 0.8) and the minimum window (4 segments) were chosen from 18 settings on the training seeds (Phase 7, finding 13).
 - **Competition detector:** when only Predictive flows share the link, their cuts let the queue drain now and then. If the lowest RTT over 2 s stays above 1.4 × the base RTT, the queue never drained, so a loss-based sender such as CUBIC is assumed. Predictive TCP then behaves like plain Reno, until 5 s after the queue was last seen not draining. The base RTT is the lowest *raw* RTT sample (Phase 10; the lowest smoothed RTT misled late-starting flows, finding 17). The three values were tuned on the training seeds. With only Predictive flows and the 50-packet buffer, it never fires.
+- **Why a decision tree:** the model runs inside every sender every 100 ms and must be exported to C++. A depth-2 tree is 4 `if/else` rules: almost free to run and easy to explain. A random forest or neural network would cost far more and be much harder to export and explain. The tree also beat Logistic Regression and a loss-based rule on the unseen seeds (accuracy 0.80 vs 0.65 and 0.55; drop bursts warned ≥ 200 ms ahead: 95% vs 85% and 38%).
 - **Safety net:** Reno's normal loss response (halving) still applies.
 - **Minimum window:** the predictor never acts below a 4-segment window.
 - **Inputs:** the model uses **only measurements the sender can make itself**. The router's queue length is used only to label the training data.
@@ -229,7 +270,7 @@ TCP-Congestion-Predictor/
 │   ├── tune_competition.py      tunes the competition detector inside NS-3 (seeds 1–3)
 │   ├── train_model.py           Decision Tree vs Logistic Regression vs loss-based detector
 │   ├── export_tree.py           tree → predictive-model.h, verified against scikit-learn
-│   ├── compare_variants.py      metrics, PRD criteria check, per-seed wins, ablation
+│   ├── compare_variants.py      metrics, success-criteria check, per-seed wins, ablation
 │   ├── significance.py          paired t-tests, 95% confidence intervals and sign tests over seeds
 │   ├── robustness.py            buffer-size sweep, competition with CUBIC, other link speeds and delays
 │   ├── prediction_baselines.py  the tree vs a trivial "always High" guess (balanced accuracy, MCC)
@@ -250,10 +291,7 @@ TCP-Congestion-Predictor/
 │   ├── RESULTS.md               results page (tables + graphs)
 │   └── *.csv                    comparison and summary tables
 ├── reference/                 macOS reference results: simulation data (39 MB), expected tables, checksums
-├── docs/                      PROJECT_PLAN and PRD (.md + .pdf)
 ├── app/                       interactive simulator (Streamlit): app.py, run_app.sh, requirements.txt
-├── tools/md2html.py           Markdown → HTML for the PDF versions of the docs
-├── HANDOFF.md                 where the project stands and what is left (read this to resume)
 ├── build.sh                   copy ns3/ into NS-3 and compile
 ├── run_baseline.sh            75 baseline runs (5 variants) + validation traces
 ├── run_predictive.sh          30 Predictive TCP runs + ablation
@@ -286,7 +324,6 @@ TCP-Congestion-Predictor/
 | `.venv` (analysis) | scikit-learn, pandas, NumPy, Matplotlib, SciPy | ~260 MB |
 | `app/.venv` (app) | Streamlit | ~320 MB |
 | `results/` after `run_all.sh` | all simulation output | ~250 MB |
-| Google Chrome (optional) | only to regenerate the PDF versions of the docs | – |
 
 ### macOS
 
@@ -383,7 +420,6 @@ On Fedora use `sudo dnf install gcc-c++ cmake ninja-build python3 git curl rsync
 | On macOS | On Linux |
 |---|---|
 | `md5 file` | `md5sum file` (see [Checking reproducibility](#checking-reproducibility)) |
-| Chrome at `/Applications/Google Chrome.app/…` | `google-chrome` or `chromium` (only for regenerating PDFs) |
 | VS Code Markdown preview: **Cmd + Shift + V** | **Ctrl + Shift + V** |
 
 **Results on Linux:** use `./run_all.sh --reference` to get results **identical to macOS** ([why and how](#getting-results-identical-to-macos-on-any-system)). A plain `./run_all.sh` re-simulates on your machine. That gives the same conclusions and very close numbers, but not byte-identical files, and the run ends by reporting exactly how close they are.
@@ -505,21 +541,6 @@ md5 results/final_table.md results/model/metrics.json results/comparison_runs.cs
 ./run_all.sh > /dev/null
 md5 results/final_table.md results/model/metrics.json results/comparison_runs.csv | diff - /tmp/before.md5 && echo "identical"
 ```
-
-### Regenerating the PDF versions of the docs
-
-`docs/PROJECT_PLAN.pdf` and `docs/PRD.pdf` are made from the Markdown files with `tools/md2html.py` and Chrome:
-
-```bash
-python3 -m venv /tmp/mdvenv && /tmp/mdvenv/bin/pip install markdown
-for f in PROJECT_PLAN PRD; do
-  /tmp/mdvenv/bin/python tools/md2html.py docs/$f.md /tmp/$f.html $f
-  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless --disable-gpu \
-    --no-pdf-header-footer --print-to-pdf="$PWD/docs/$f.pdf" file:///tmp/$f.html
-done
-```
-
-On this project's Mac, Chrome is installed as `Google Chrome 2.app`, so adjust the path if needed. On Linux or WSL, replace the Chrome path with `google-chrome` or `chromium`.
 
 ---
 
@@ -745,7 +766,7 @@ Each finished run is saved in `app/runs/`, so repeating the same settings is ins
 
 21. **Fair on fast links, or strong on the main link: with this design, not both (Phase 11).** `analysis/signal_tradeoff.py` (optional, ~40 min) gave 6 models a fair chance on the training seeds: the deployed one and the 5 model-selection candidates retrained on the cleaner RTT signal of finding 18, each with the full Phase 7 grid of β × MinWindow (108 settings). The rule was written before running: the Phase 7 limits, plus fairness ≥ 0.9 at 50 Mbps / 20 ms, then the largest drop + RTT reduction.
     - **The deployed model fails the 50 Mbps limit at every eligible setting** (Jain 0.24–0.74), and so does the delay-only model retrained on the new signal (0.41–0.85). The cleaner signal alone does not make it fair.
-    - **Only the full feature set with a hard cut (β 0.5) passes.** The best such setting (0.2 s horizon, β 0.5, MinWindow 2) is fair at 50 Mbps (0.92) but keeps about half the gain: drops −53% / −69% and RTT −6% / −9% at medium / high load, against −92% / −90% and −26% / −36% for the deployed model. It still meets all 9 PRD criteria, by smaller margins.
+    - **Only the full feature set with a hard cut (β 0.5) passes.** The best such setting (0.2 s horizon, β 0.5, MinWindow 2) is fair at 50 Mbps (0.92) but keeps about half the gain: drops −53% / −69% and RTT −6% / −9% at medium / high load, against −92% / −90% and −26% / −36% for the deployed model. It still meets all 9 success criteria, by smaller margins.
     - **Decision:** the deployed model was kept. The 50 Mbps fairness limit was dropped *after* its price was seen; this is a deliberate choice of the main 10 Mbps result over fairness on fast links, stated here openly. The full table is in `results/model/signal_tradeoff.csv`.
     - **What it suggests:** fairness on fast links needs a different reaction, not just a better signal. A fair delay-based design adjusts each flow toward a target *queue share* (as Vegas, FAST and Copa do), instead of the same multiplicative cut for every flow.
 
