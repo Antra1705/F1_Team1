@@ -116,6 +116,9 @@ table.data tr.proposed td { font-weight: 600; background: rgba(255, 255, 255, 0.
 table.data tr.proposed td:first-child { color: var(--vermilion-text); padding-left: 0.5rem;
                                         box-shadow: inset 2px 0 0 var(--vermilion); }
 table.data td.best { color: var(--good); font-weight: 600; }
+table.data td.worse { color: var(--bad); }
+table.data td.wrap { white-space: normal; text-align: left; }
+.setup-line { font-size: 0.86rem; color: var(--muted); margin: 0 0 0.8rem; }
 table.data tr.proposed td.text:nth-child(2) { color: var(--vermilion-text); }
 table.data td.na { color: var(--faint); }
 table.data th.text, table.data td.text { text-align: left; font-family: inherit; white-space: normal; }
@@ -491,7 +494,99 @@ with tab_sim:
             c1.altair_chart(line_chart(both, "Mean RTT (ms)", 2), width="stretch", height=260)
             c2.altair_chart(line_chart(both, "Bottleneck queue (packets)", 3), width="stretch", height=260)
 
+def html_table(header, rows, text_cols=1):
+    """rows: list of (cells, row_class); a cell is a value or a (value, cell_class) pair."""
+    head = "".join(f'<th class="text">{html.escape(h)}</th>' if i < text_cols else f"<th>{html.escape(h)}</th>"
+                   for i, h in enumerate(header))
+    body = []
+    for cells, row_class in rows:
+        tds = []
+        for i, cell in enumerate(cells):
+            value, cls = cell if isinstance(cell, tuple) else (cell, "")
+            cls = " ".join(c for c in ["text" if i < text_cols else "", cls] if c)
+            tds.append(f'<td class="{cls}">{html.escape(str(value))}</td>')
+        body.append(f'<tr class="{row_class}">{"".join(tds)}</tr>')
+    return (f'<div class="table-wrap"><table class="data"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>')
+
+
 with tab_results:
+    st.markdown('<div class="section">Scenarios and metrics</div>', unsafe_allow_html=True)
+    st.markdown('<p class="setup-line">Dumbbell network: N senders → 10 Mbps / 20 ms bottleneck (50-packet FIFO queue) '
+                '→ receiver; base RTT 44 ms. Every run lasts 60 s and is repeated on 10 seeds (1–3 used for training '
+                'and tuning, 4–10 never seen). Baselines: Tahoe, Reno, CUBIC, Vegas, BBR. Proposed: Predictive TCP.</p>',
+                unsafe_allow_html=True)
+    scenarios = [
+        ("Low load", "3 on/off TCP flows, about 30% load", "No congestion: does prediction cost anything?"),
+        ("Medium load", "6 on/off TCP flows, about 90% load, bursty", "Main test: bursty congestion"),
+        ("High load", "8 long-lived TCP flows + 2 Mbps on/off UDP", "Main test: saturated link"),
+        ("Single flow", "1 flow alone on the link", "Can it still fill an empty link?"),
+        ("Buffer size", "20- and 100-packet queue instead of 50", "Robustness to the buffer size"),
+        ("Share with CUBIC", "4 flows of one variant + 4 CUBIC flows, high load", "Fairness against loss-based TCP"),
+        ("Link speed and delay", "5, 10, 50 Mbps × 20, 100 ms", "Robustness to other networks"),
+    ]
+    st.markdown(html_table(["Scenario", "Setting", "Purpose"],
+                           [([name, (setting, "wrap"), (purpose, "wrap")], "") for name, setting, purpose in scenarios],
+                           text_cols=3), unsafe_allow_html=True)
+    metrics = [
+        ("Goodput (Mbps)", "Useful data delivered per second, without retransmissions", "Higher"),
+        ("Average RTT (ms)", "Round-trip delay a packet sees, including time waiting in the queue", "Lower"),
+        ("Drops", "Packets discarded because the bottleneck queue was full", "Lower"),
+        ("Retransmissions", "Packets the senders had to send again", "Lower"),
+        ("Queue (packets)", "Average length of the bottleneck queue", "Lower"),
+        ("Jain fairness index", "How equally the flows share the link (1 = perfectly equal)", "Closer to 1"),
+        ("Share vs CUBIC", "Share of the goodput when sharing the link with CUBIC (fair = 50%)", "Closer to 50%"),
+        ("Prediction quality", "Macro-F1 and recall of “High” of the decision tree, on unseen seeds", "Higher"),
+    ]
+    st.markdown(html_table(["Metric", "What it measures", "Better"],
+                           [([name, (meaning, "wrap"), (better, "wrap")], "") for name, meaning, better in metrics],
+                           text_cols=3), unsafe_allow_html=True)
+
+    summary_file, vs_file, wins_file = (RESULTS / "comparison_summary.csv", RESULTS / "predictive_vs_baselines.csv",
+                                        RESULTS / "seed_wins.csv")
+    if summary_file.exists() and vs_file.exists() and wins_file.exists():
+        st.markdown('<div class="section">Results (baseline vs proposed) · mean over 10 seeds</div>',
+                    unsafe_allow_html=True)
+        summary = pd.read_csv(summary_file).set_index(["level", "variant"])
+        rows = []
+        for label, col, fmt, higher_better in [("Goodput (Mbps)", "goodput_mbps", "{:.2f}", True),
+                                               ("Average RTT (ms)", "mean_rtt_ms", "{:.1f}", False),
+                                               ("Drops", "drops", "{:.0f}", False),
+                                               ("Retransmissions", "retransmissions", "{:.0f}", False),
+                                               ("Queue (packets)", "mean_queue_pkts", "{:.1f}", False),
+                                               ("Jain fairness index", "jain_fairness", "{:.3f}", True)]:
+            cells = [label]
+            for level in ["medium", "high"]:
+                base, prop = summary.loc[(level, "reno"), col], summary.loc[(level, "predictive"), col]
+                change = 100 * (prop - base) / base
+                better = change > 0 if higher_better else change < 0
+                cells += [fmt.format(base), fmt.format(prop),
+                          (f"{change:+.1f}%".replace("-", "−"), "best" if better and abs(change) >= 0.5 else
+                           "worse" if not better and abs(change) >= 0.5 else "")]
+            rows.append((cells, ""))
+        st.markdown(html_table(["Metric", "Reno · medium", "Predictive · medium", "Change",
+                                "Reno · high", "Predictive · high", "Change"], rows), unsafe_allow_html=True)
+
+        vs = pd.read_csv(vs_file).set_index(["level", "vs"])
+        wins = pd.read_csv(wins_file).set_index(["level", "vs"])
+        rows = []
+        for base in ["tahoe", "reno", "cubic", "vegas", "bbr"]:
+            cells = [f"vs {NAMES.get(base, base)}"]
+            for level in ["medium", "high"]:
+                w = wins.loc[(level, base)]
+                for metric, won in [("drops_%", "fewer_drops"), ("rtt_%", "lower_rtt")]:
+                    change = vs.loc[(level, base), metric]
+                    cells.append((f"{change:+.0f}% · {w[won]}/{w.seeds} seeds".replace("-", "−"),
+                                  "best" if change < 0 else "worse"))
+            rows.append((cells, ""))
+        st.markdown(html_table(["Proposed compared with", "Drops · medium", "RTT · medium", "Drops · high",
+                                "RTT · high"], rows), unsafe_allow_html=True)
+        criteria = RESULTS / "prd_criteria_check.csv"
+        met = pd.read_csv(criteria).met if criteria.exists() else pd.Series(dtype=bool)
+        st.markdown(f'<div class="note">Change = Predictive TCP relative to the baseline; green is better, blue is '
+                    f'worse. Every drop and RTT gain over Reno and CUBIC is significant (paired t-test, p &lt; 0.0001). '
+                    f'Success criteria met: {int(met.sum())} of {len(met)}.</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="section">Final results · mean ± std over 10 seeds × 60 s · 10 Mbps / 20 ms / '
                 '50-packet queue</div>', unsafe_allow_html=True)
     final = RESULTS / "final_table.csv"

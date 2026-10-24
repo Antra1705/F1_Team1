@@ -31,7 +31,7 @@ Fewer drops mean fewer retransmissions and less wasted bandwidth. A shorter queu
 
 ### In one sentence
 
-> Predictive TCP cuts packet drops by about **90%** and delay by **26–37%** compared with Reno, while keeping **98–100%** of Reno's throughput. Its main weakness is that it gives up bandwidth when it shares a link with aggressive CUBIC flows.
+> Predictive TCP cuts packet drops by about **90%** and delay by **28–36%** compared with Reno, while keeping **97–100%** of Reno's throughput. Its main weakness is that it gives up bandwidth when it shares a link with aggressive CUBIC flows.
 
 ---
 
@@ -610,7 +610,7 @@ NS-3 must already be built (`./build.sh`). The app calls the compiled program di
    - Four charts over time (goodput, RTT, bottleneck queue, cwnd): drag to pan, scroll to zoom, hover for values.
    - A CSV download.
    - The network diagram at the top fills its queue boxes to the measured average queue of the last run.
-3. **Project results tab:** the final 5-seed table and all report graphs.
+3. **Project results tab:** the final 10-seed table and all report graphs.
 4. **How it works tab:** the decision-tree rules, the competition detector and the generated C++ code.
 
 ### A good demo sequence
