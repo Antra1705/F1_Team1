@@ -1,11 +1,5 @@
 # Handoff: Where This Project Stands
 
-**For:** Claude (or anyone) picking this project up again, for example after cloning it from GitHub.
-**Start here:** read this file, then `README.md`, then `docs/PROJECT_PLAN.md` (sections 0 and 12).
-**Last updated:** 23 Oct 2026, after Phase 13 (10 seeds).
-
----
-
 ## 1. The Project in Brief
 
 - **Course:** BCSE308L Computer Networks, VIT, taught by Prof. Sreethar S.
