@@ -3,10 +3,26 @@
 A college networking project that compares **TCP Tahoe, Reno, CUBIC, Vegas and BBR** in NS-3, trains a **lightweight decision tree** to predict bottleneck congestion **0.5 s before it happens**, and uses that prediction inside a new TCP variant, **Predictive TCP**. Predictive TCP backs off *before* the router queue overflows.
 
 **Authors:** Antra (24BDS0066) · Anuska Sen (24BCE2219) · Varshini Harikrishna (24BCE0780)  
-**Course:** BCSE308L Computer Networks, VIT  
+**Course:** BCSE308L Computer Networks / BCSE308P Computer Networks Lab, VIT  
+**Slot / Team:** F1 · Team 1 (`F1_Team1`)  
 **Stack:** NS-3.48 (C++), Python 3.13, scikit-learn (decision tree), pandas, NumPy, SciPy, Matplotlib, Streamlit ([details](#tech-stack))
 
-**Contents:** [About](#about-the-project) · [Use cases](#use-cases) · [Tech stack](#tech-stack) · [What was done](#what-was-done) · [How to run](#how-to-run) · [Results](#headline-results) · [How it works](#how-predictive-tcp-works) · [Project structure](#project-structure) · [Setup](#setup-step-by-step) · [Running](#running-the-experiments) · [Same results on every OS](#getting-results-identical-to-macos-on-any-system) · [Interactive app](#interactive-simulator-app) · [Troubleshooting](#troubleshooting) · [Experiment setup](#experiment-setup) · [Findings](#key-findings-and-design-decisions) · [Limitations](#limitations)
+**Contents:** [Submission files](#submission-files-f1_team1) · [About](#about-the-project) · [Use cases](#use-cases) · [Tech stack](#tech-stack) · [What was done](#what-was-done) · [How to run](#how-to-run) · [Results](#headline-results) · [How it works](#how-predictive-tcp-works) · [Project structure](#project-structure) · [Setup](#setup-step-by-step) · [Running](#running-the-experiments) · [Same results on every OS](#getting-results-identical-to-macos-on-any-system) · [Interactive app](#interactive-simulator-app) · [Troubleshooting](#troubleshooting) · [Experiment setup](#experiment-setup) · [Findings](#key-findings-and-design-decisions) · [Limitations](#limitations)
+
+---
+
+## Submission Files (F1_Team1)
+
+| File | What it is |
+|---|---|
+| [`docs/F1_Team1_Report.pdf`](docs/F1_Team1_Report.pdf) | Project report: introduction, literature survey, proposed system, implementation, evaluation results and limitations |
+| [`docs/F1_Team1_PPT.pdf`](docs/F1_Team1_PPT.pdf) | Presentation slides |
+| [`docs/F1_Team1_Demo.pdf`](docs/F1_Team1_Demo.pdf) | Project demonstration: setup, step-by-step procedure, observations and results (seed 4) |
+| [`docs/F1_Team1_Screenshots.zip`](docs/F1_Team1_Screenshots.zip) | Topology diagram and dashboard screenshots of the interactive simulator (also unzipped in [`docs/screenshots/`](docs/screenshots/)) |
+| [`ns3/`](ns3/), [`analysis/`](analysis/), [`app/`](app/), `*.sh` | Complete source code: NS-3 simulation (C++), analysis pipeline (Python), dashboard (Streamlit), run scripts |
+| [`results/`](results/), [`reference/`](reference/) | Testing results: tables, graphs, trained model, significance tests and the reference data used to verify them |
+
+The network simulation is the NS-3 program in [`ns3/tcp-predictor.cc`](ns3/tcp-predictor.cc) (dumbbell topology, configured in code), not a Packet Tracer file. Software requirements, installation, execution steps and expected results are in [How to run](#how-to-run), [Setup](#setup-step-by-step) and [Headline results](#headline-results).
 
 ---
 
@@ -131,8 +147,8 @@ Every command below is typed in a **terminal**, from the **project folder**. Pic
 Then go to the project folder and check you are in the right place:
 
 ```bash
-cd ~/Desktop/Antra/VIT/CN/TCP-Congestion-Predictor   # or wherever you cloned it
-ls                                                   # should list run_all.sh, build.sh, README.md, ns3/, analysis/ …
+cd ~/Desktop/F1_Team1   # or wherever you cloned it
+ls                      # should list run_all.sh, build.sh, README.md, ns3/, analysis/ …
 ```
 
 Type each command and press **Enter**. Lines starting with `#` are comments, not commands. If a script says `Permission denied`, run `chmod +x *.sh app/run_app.sh` once. A long run (`./run_all.sh`) prints each step as it goes. Leave the terminal open until it prints `Done.` To stop any command, press **Ctrl + C**.
@@ -158,8 +174,8 @@ Only what your option needs. Exact commands per OS are in [Setup](#setup-step-by
 **B. Rebuild every result without NS-3** (macOS, Linux or Windows-via-WSL). The results come out [identical to macOS](#getting-results-identical-to-macos-on-any-system):
 
 ```bash
-git clone https://github.com/Antra1705/CN.git TCP-Congestion-Predictor
-cd TCP-Congestion-Predictor
+git clone https://github.com/Antra1705/F1_Team1.git
+cd F1_Team1
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # once
 ./run_all.sh --reference
 ```
@@ -257,7 +273,7 @@ Every 100 ms the sender measures its own RTT and runs this tree. The tree was le
 ## Project Structure
 
 ```
-TCP-Congestion-Predictor/
+F1_Team1/
 ├── ns3/                       NS-3 C++ code (copied into ~/ns-3/scratch/tcp-predictor by build.sh)
 │   ├── tcp-predictor.cc         dumbbell simulation, 6 variants, congestion levels, 100 ms CSV tracing
 │   ├── tcp-variants.h/.cc       TcpTahoe(+Recovery), TcpReno(+Recovery), TcpPredictive
@@ -292,6 +308,8 @@ TCP-Congestion-Predictor/
 │   └── *.csv                    comparison and summary tables
 ├── reference/                 macOS reference results: simulation data (39 MB), expected tables, checksums
 ├── app/                       interactive simulator (Streamlit): app.py, run_app.sh, requirements.txt
+├── docs/                      submission files: F1_Team1_Report.pdf, F1_Team1_PPT.pdf, F1_Team1_Demo.pdf,
+│                                F1_Team1_Screenshots.zip, screenshots/
 ├── build.sh                   copy ns3/ into NS-3 and compile
 ├── run_baseline.sh            75 baseline runs (5 variants) + validation traces
 ├── run_predictive.sh          30 Predictive TCP runs + ablation
@@ -343,8 +361,8 @@ brew install cmake ninja uv
 #### Step 2: Get the project
 
 ```bash
-git clone https://github.com/Antra1705/CN.git TCP-Congestion-Predictor
-cd TCP-Congestion-Predictor
+git clone https://github.com/Antra1705/F1_Team1.git
+cd F1_Team1
 chmod +x *.sh app/run_app.sh              # make the scripts executable (needed after some downloads)
 ```
 
@@ -439,7 +457,7 @@ Restart when asked. Then open **Ubuntu** from the Start menu and create a Linux 
 **Step 2: Follow the [Linux](#linux-ubuntu--debian) steps inside the Ubuntu window,** from "Build tools" onward.
 
 **Windows tips:**
-- **Keep the project inside the Linux file system** (for example `~/TCP-Congestion-Predictor`), not under `/mnt/c/…`. Building and running on `/mnt/c` is many times slower.
+- **Keep the project inside the Linux file system** (for example `~/F1_Team1`), not under `/mnt/c/…`. Building and running on `/mnt/c` is many times slower.
 - **VS Code:** install the **WSL** extension, then run `code .` in the project folder inside Ubuntu. VS Code opens the files with full editing and Markdown preview.
 - **The app:** run `./app/run_app.sh` inside Ubuntu, then open **http://localhost:8501** in your Windows browser. WSL2 forwards localhost automatically.
 - **Line endings:** the repository's `.gitattributes` forces Unix line endings for scripts, so this should not happen. If a script still fails with `bad interpreter: /bin/bash^M`, the files were checked out with Windows line endings. Run `git config --global core.autocrlf input` and clone again inside Ubuntu, or run `sed -i 's/\r$//' *.sh app/run_app.sh`.
@@ -607,7 +625,7 @@ NS-3 must already be built (`./build.sh`). The app calls the compiled program di
 ```bash
 ./app/run_app.sh                  # from the project folder
 # or from anywhere:
-~/Desktop/Antra/VIT/CN/TCP-Congestion-Predictor/app/run_app.sh
+~/Desktop/F1_Team1/app/run_app.sh
 ```
 
 - **Opening:** the browser opens **http://localhost:8501** by itself. If it doesn't (always the case on WSL), open the address manually in any browser.
@@ -651,7 +669,7 @@ Each finished run is saved in `app/runs/`, so repeating the same settings is ins
 
 | Problem | Cause and fix |
 |---|---|
-| `zsh: no such file or directory: ./app/run_app.sh` (or `./run_all.sh`) | You're not in the project folder. Run `cd ~/Desktop/Antra/VIT/CN/TCP-Congestion-Predictor` first, or use the full path. |
+| `zsh: no such file or directory: ./app/run_app.sh` (or `./run_all.sh`) | You're not in the project folder. Run `cd ~/Desktop/F1_Team1` first, or use the full path. |
 | `permission denied: ./run_all.sh` | Scripts lost their executable flag: `chmod +x *.sh app/run_app.sh`. |
 | `xcrun: error: invalid active developer path` | Command Line Tools missing or not selected: `xcode-select --install`, then `sudo xcode-select -s /Library/Developer/CommandLineTools`. |
 | `cmake: command not found` / `ninja: command not found` | `brew install cmake ninja`. |
